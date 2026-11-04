@@ -1,22 +1,27 @@
 # Simulation Hub
 
-**Phase 2 — Proof Sims.** The Phase-1 platform (plugin contract, fixed-timestep
-loop, URL state, seeded determinism, CI/CD) now stress-tested by three very
-different workloads under **Contract v2**:
+**Phase 4 — Grids & Algorithms.** A deterministic simulation platform with **14 simulations across four execution paradigms** (real-time, batch, event, trace) under **Contract v4**:
 
-| Sim | Kind | Stresses |
+| Sim | Kind | Showcases |
 |---|---|---|
-| Bouncing Balls | realtime | the v1→v2 migration (live params, pointer spawn, HUD) |
-| Boids Flocking | realtime | SoA typed arrays, spatial hash, 10k agents, predators |
-| Monte Carlo Portfolio | batch (workers) | deterministic chunked jobs, fan chart, cancellation |
-| Tax Wrappers (IKE/IKZE) | batch (inline) | rules-as-data with sources, hand-calculated tests |
-| Game of Life | realtime | cellular automata, seeded patterns, paint-on-canvas |
-| Double Pendulum | realtime | RK4 chaos, ghost divergence, energy conservation |
-| Raft Consensus | realtime | elections, log replication, crash/revive nodes |
-| Monte Carlo π | batch | chunked estimation, 1/√N convergence band |
+| **Pathfinding Arena** | trace | A*, Dijkstra, BFS, greedy, JPS on an editable weighted grid; admissibility badge; work-synced race |
+| **Falling Sand** | realtime | 400×300 materials CA, data-driven reactions, shared grid editor painting at step boundaries |
+| **Cache Hierarchy** | trace | Set-associative L1/L2/L3, LRU/FIFO/random, AMAT, row- vs column-major matrix race |
+| **Time-Travel Debugger** | event | Scrub history backwards, inspect snapshot intervals, branch alternate futures, inject faults, replay bit-identity |
+| **CPU Scheduler** | event | FCFS, SJF, RR, Priority, SRTF, Gantt timeline, custom process table, compare tab |
+| **Raft Consensus** | event | Distributed consensus, leader elections, log replication, partition faults, time-travel, invariant fuzzing |
+| **JVM GC Visualizer** | event | Stop-the-world pauses, fragmentation, generational nursery/tenuring, nepotism, OOM, compare tab |
+| **Boids Flocking** | realtime | Structure-of-arrays typed arrays, counting-sort spatial hash, 10k agents, predators, live parameters |
+| **Monte Carlo Portfolio** | batch (workers) | Web Worker pool, deterministic chunking, fan chart, sequence-of-returns risk |
+| **Double Pendulum** | realtime | RK4 symplectic integration, Lyapunov ghost divergence, energy conservation invariants |
+| **Game of Life** | realtime | Conway B3/S23 cellular automaton, wrap torus, paintable canvas, seeded pattern soups |
+| **Tax Wrappers (IKE/IKZE)** | batch (inline) | Data-driven legal rules with source URLs, hand-calculated verification tests |
+| **Monte Carlo π** | batch | Deterministic chunked estimation, $1/\sqrt{N}$ confidence band tightening |
+| **Bouncing Balls** | realtime | Fixed-timestep accumulator loop, restitution, seeded Mulberry32 RNG, URL state |
 
-Press **P** in any realtime sim for the perf HUD. Every sim is reproducible
-from its URL: `#/sim/monte-carlo?seed=7&runs=20000`, `#/sim/boids?count=5000`.
+Press **P** in any real-time simulation for the performance HUD. Trace sims support playback, stepping and two-pane compare; the grid editor is shared by Pathfinding and Falling Sand.
+Press **Space** (play/pause), **.** (step forward), **,** (step back), **Home** / **End**, or scrub the timeline in any event simulation.
+Every simulation run is bit-identical and shareable via its URL hash (e.g. `#/sim/raft?scenario=isolate-leader`, `#/sim/cpu-scheduler?algorithm=sjf`).
 
 **Live demo:** `https://bielinskilukasz.github.io/simulation-hub/`
 
@@ -27,7 +32,7 @@ from its URL: `#/sim/monte-carlo?seed=7&runs=20000`, `#/sim/boids?count=5000`.
 ```bash
 npm install
 npm run dev        # dev server
-npm test           # Vitest — 23 tests, node environment (core needs no DOM)
+npm test           # Vitest — 210 tests, node environment (core needs no DOM)
 npm run lint       # ESLint, incl. the architecture rules below
 npm run typecheck  # tsc --noEmit (strict + noUncheckedIndexedAccess)
 npm run build      # production build

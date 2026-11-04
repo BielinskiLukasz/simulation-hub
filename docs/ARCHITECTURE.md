@@ -1,6 +1,65 @@
 # Architecture — Simulation Hub
 
-## Contract v2 (Phase 2) — the one deliberate revision
+## Contract v4 (Phase 4) — editable grids, traces, compare
+
+- New kind `trace`: pure `run(input, params) → TraceResult` (struct-of-arrays),
+  with `input` codecs/generators/editor, optional `compare` modes and
+  `TraceResult.work` for fair work-synchronised races.
+- `TraceCursor` semantics (documented + tested): position `n` means steps
+  `0..n-1` applied; seeking backwards restores the nearest checkpoint and
+  replays ≤ K steps. Never per-algorithm inverse logic.
+- Grid editing: pure `GridEdit → GridPatch`; strokes merge into one undo
+  entry; the same editor is used by Pathfinding (trace) and Falling sand
+  (realtime, edits queued by the runner onto step boundaries).
+- Authoring rules: `run` pure/deterministic (no clocks; compute time shown
+  only in the shell), integer fixed-point costs (ORTHO 1000, DIAG 1415),
+  traces in typed arrays, views render idempotently for any position.
+- JPS is constrained to uniform cost + corner=never and is verified against
+  exact A* octile, falling back to the exact trace if pruning would ever be
+  suboptimal (robustness over cleverness).
+- Cache caches are validated powers of two; an independent naive reference
+  model is differential-tested against the optimized model.
+- Known v5 candidates: generic camera/pan-zoom, compare mode for realtime
+  sims, trace compression for very large runs, and async trace runs through
+  the Phase-2 worker pool.
+
+
+## Contract v3 (Phase 3) — Discrete-Event Engine & Time-Travel
+
+Contract v3 introduces the third simulation kind: `EventSimulation<P, S, E, A>` alongside `RealtimeSimulation` and `BatchSimulation`.
+
+```ts
+export interface EventSimulation<P, S, E, A> {
+  kind: 'event';
+  meta: SimMeta;
+  defaultParams: P;
+  paramSchema: ParamSchema<P>;
+  playback: { unit: string; baseRate: number };
+  init(params: P, ctx: InitCtx<E>): S;
+  handle(ctx: EventCtx<S, E>, ev: E): void;
+  applyAction?(ctx: EventCtx<S, E>, action: A): void;
+  render(state: S, rc: RenderContext, view: { now: number; head: number }): void;
+  deriveTimeline?(log: readonly LogEntry[], now: number, params: P): TimelineData;
+  invariants?: Invariant<S>[];
+  isFinished?(state: S): boolean;
+  about: SimAbout;
+}
+```
+
+### Core Invariants of Contract v3
+
+1. **State is strictly Plain Data:**  
+   State must only contain primitives, plain objects, standard arrays, or typed arrays. No class instances, prototypes, closures, or DOM nodes (`assertPlainData` enforced in test suites). This guarantees that `structuredClone` creates pure, deep-independent snapshots.
+2. **Integer Simulation Time:**  
+   Time is strictly integer units (`ms`, `µs`, or abstract units). Tie-breaking is deterministic via `(time, id)` sequence ordering in the binary min-heap.
+3. **Time-Travel via Snapshot + Replay:**  
+   See [`DESIGN-TIME-TRAVEL.md`](./DESIGN-TIME-TRAVEL.md). States are reconstructed via $f(\text{Params}, \text{Seed}, \text{InputLog})$, with snapshot thinning keeping memory bounded and seek latency sub-millisecond. Verified by `assertReplayEquivalence` across all event simulations.
+4. **Invariant Oracle System:**  
+   Simulations export pure `check(state) -> string | null` functions. Invariants run continuously after every event in fuzz testing and drive the live UI Invariant Badge.
+
+---
+
+## Contract v2 (Phase 2) — Proof Sims
 
 Phase 1's friction list, resolved:
 

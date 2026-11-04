@@ -3,8 +3,8 @@
 
 import type { Rng } from './types';
 
-export function createRng(seed: number): Rng {
-  let a = seed >>> 0;
+export function createRng(seed: number, state?: number): Rng {
+  let a = (state !== undefined ? state : seed) >>> 0;
   const next = (): number => {
     a = (a + 0x6d2b79f5) >>> 0;
     let t = a;
@@ -14,6 +14,7 @@ export function createRng(seed: number): Rng {
   };
   return {
     next,
+    state: () => a >>> 0,
     range: (min, max) => min + next() * (max - min),
     int: (min, max) => Math.floor(min + next() * (max - min + 1)),
     pick: (items) => {

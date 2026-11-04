@@ -7,7 +7,7 @@
 //    before stepping — input always lands on a step boundary (Phase 3 replay)
 //  • applyLiveParams() hot-updates live params via sim.applyParams, no re-init
 
-import type { RealtimeSimulation, RenderContext } from './types';
+import type { GridEdit, RealtimeSimulation, RenderContext } from './types';
 import type { PointerEv } from './input';
 import { createRng } from './rng';
 import { Ema, RollingMax, type RunnerStats } from './stats';
@@ -32,6 +32,7 @@ export class Runner<P, S> {
   private rafId = 0;
   private running = false;
   private queue: PointerEv[] = [];
+  private editQueue: GridEdit[] = [];
   private now: () => number;
 
   private fpsEma = new Ema(0.08);
@@ -77,6 +78,17 @@ export class Runner<P, S> {
     }
   }
 
+  /** Contract v4: queue a grid edit; applied at the next step boundary. */
+  edit(edit: GridEdit): void {
+    if (!this.sim.onEdit) return;
+    if (this.paused) {
+      this.state = this.sim.onEdit(this.state, edit);
+      this.renderNow();
+    } else {
+      this.editQueue.push(edit);
+    }
+  }
+
   tick(tsMs: number): void {
     if (this.lastTs === null) this.lastTs = tsMs;
     const rawDelta = tsMs - this.lastTs;
@@ -87,6 +99,10 @@ export class Runner<P, S> {
       this.frameMax.push(rawDelta);
     }
 
+    if (this.editQueue.length > 0 && this.sim.onEdit) {
+      for (const e of this.editQueue) this.state = this.sim.onEdit(this.state, e);
+      this.editQueue.length = 0;
+    }
     // input lands on a step boundary, before any stepping, in order
     if (this.queue.length > 0 && this.sim.onPointer) {
       for (const ev of this.queue) this.state = this.sim.onPointer(this.state, ev);

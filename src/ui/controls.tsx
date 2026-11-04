@@ -14,7 +14,37 @@ interface Props<P extends Record<string, any>> {
 }
 
 export function Controls<P extends Record<string, any>>({ schema, params, onChange }: Props<P>) {
-  const keys = Object.keys(schema) as (keyof P)[];
+  // Contract v4: ParamDef.group → collapsible sections (Cache uses
+  // Pattern / Cache / Timing / Run). Section order = first appearance.
+  const groups: { name: string | null; keys: (keyof P)[] }[] = [];
+  for (const key of Object.keys(schema) as (keyof P)[]) {
+    const group = (schema[key] as ParamDef).group ?? null;
+    const existing = groups.find((g) => g.name === group);
+    if (existing) existing.keys.push(key);
+    else groups.push({ name: group, keys: [key] });
+  }
+  if (groups.length <= 1) {
+    return <div className="space-y-5"><ControlList schema={schema} params={params} onChange={onChange} only={Object.keys(schema) as (keyof P)[]} /></div>;
+  }
+  return (
+    <div className="space-y-3">
+      {groups.map((g, i) => (
+        <details key={g.name ?? 'general'} open={i === 0} className="group rounded-xl border border-slate-200 bg-slate-900/[.02] p-3 dark:border-white/10 dark:bg-white/[.03]">
+          <summary className="flex cursor-pointer list-none items-center justify-between text-[11px] font-black tracking-wide text-slate-500 uppercase dark:text-slate-300">
+            {g.name ?? 'General'}
+            <span className="text-[10px] font-bold text-slate-400 transition group-open:rotate-90">▶</span>
+          </summary>
+          <div className="mt-3">
+            <ControlList schema={schema} params={params} onChange={onChange} only={g.keys} />
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+function ControlList<P extends Record<string, any>>({ schema, params, onChange, only }: Props<P> & { only: (keyof P)[] }) {
+  const keys = only;
   return (
     <div className="space-y-5">
       {keys.map((key) => {
@@ -98,6 +128,19 @@ export function Controls<P extends Record<string, any>>({ schema, params, onChan
                   <span className="rounded-md bg-slate-900/[.05] px-2 py-1 font-mono text-[12px] text-slate-600 dark:bg-white/10 dark:text-slate-200">{String(value).toUpperCase()}</span>
                   <span className="h-6 w-6 rounded-full border border-black/10" style={{ background: String(value) }} aria-hidden />
                 </div>
+              </>
+            )}
+
+            {def.kind === 'text' && (
+              <>
+                <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-slate-700 dark:text-slate-200">{def.label}</label>
+                <input
+                  id={id} type="text" key={String(value)} defaultValue={String(value)} placeholder={def.placeholder} aria-label={def.label}
+                  onBlur={(e) => { if (e.target.value !== String(value)) onChange(key, e.target.value as P[keyof P]); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-[12px] text-slate-800 dark:border-white/15 dark:bg-white/[.06] dark:text-slate-100"
+                />
+                {def.editor && <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">Structured editor below ↓</p>}
               </>
             )}
 

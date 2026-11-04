@@ -73,6 +73,10 @@ export function decodeState<P extends Record<string, any>>(
         if (HEX6.test(hex)) params[key] = `#${hex.toLowerCase()}`;
         break;
       }
+      case 'text': {
+        if (!def.pattern || new RegExp(def.pattern).test(raw)) params[key] = raw;
+        break;
+      }
     }
   }
   const seedRaw = query.get('seed');

@@ -1,5 +1,38 @@
 # Changelog
 
+## Contract v4 — Phase 4 (Grids & Algorithms)
+
+- **Grid core (`core/grid/`):** typed-array grid + corner-rule neighbours, pure edits (stamp/line/rect/flood-fill/replace) with exact undo patches, RLE+base64url and JSON codecs with strict validation, four perfect-maze generators, seeded value-noise terrain, ASCII fixtures. `UndoStack`, indexed min-heap.
+- **Trace infrastructure (`core/trace/`):** `TraceCursor` (checkpoints + bounded replay; position n = steps 0..n-1 applied), fractional `TracePlayer`, `SyncGroup` (steps / work / normalized).
+- **Contract v4 types:** `kind: 'trace'` with `input`/`input.codec`, `compare` modes + `enforce`, `TraceResult.work`; realtime sims gain `editor`/`onEdit`; `ParamDef.group`; runner edit queue.
+- **UI:** `ImageData` grid canvas with overlays/markers, shared `mountGridEditor` (brush/line/rect/fill/eraser, palette, stroke-merged undo, draggable markers, JSON import/export), and a trace shell with scrubbing, step-back, step log, compare panes with three sync modes and shareable `in=`/`cmp=`/`b.*` URLs.
+- **Sims:** Pathfinding Arena (five algorithms, fixed-point costs, admissibility/optimality badges, ASCII + property tests), Falling Sand (data-table materials/reactions, bottom-up alternating scan with stamps, 400×300, editor on a live sim), Cache Hierarchy (exact caches + independent reference model, AMAT, matrix-locality compare).
+- **Verification:** 210 unit tests passing; ESLint + strict TypeScript clean.
+
+## Contract v3 — Phase 3 (Signature Sims & Time-Travel Engine)
+
+- **Discrete-Event Engine (`core/des/`):**
+  - Binary min-heap priority queue with lazy $O(1)$ cancellation and $O(K)$ snapshot restore (`event-queue.ts`).
+  - Strict integer simulation time with monotonic tie-breaking and loop starvation protection (`engine.ts`).
+  - Time-travel `Player` with snapshot thinning and bounded replay (`player.ts`, [`docs/DESIGN-TIME-TRAVEL.md`](./docs/DESIGN-TIME-TRAVEL.md)).
+  - Headless runner (`headless.ts`) for headless compare benchmarks and property test suites.
+  - Replay equivalence verification (`assertReplayEquivalence`) and plain data enforcement (`assertPlainData`).
+  - RNG internal state capture (`Rng.state()`) and resumption (`createRng(seed, state)`).
+  - New `text` parameter kind with pattern validation and custom editor registration (`editor: 'process-table'`).
+- **Event Shell UI (`ui/event-page.tsx`):**
+  - Scrubbing, frame/event stepping forward/backward, jump to start/end, variable playback rates ($0.1\times$ to $20\times$).
+  - Full branching history when taking user actions in the past.
+  - Virtualized, filterable event log panel with actor/category chips, search, and JSON export.
+  - Interactive canvas timeline/Gantt component with time-to-pixel zoom, pan, hover tooltips, and click-to-seek (`ui/timeline.tsx`).
+  - Live Invariant Badge displaying real-time safety invariants.
+  - Markdown-rendered Concepts tab with educational explanations and simplifications list.
+- **Simulations:**
+  - **CPU Scheduler:** FCFS, SJF, RR, Priority, SRTF; textbook convoy and SJF test cases, process table editor, compare tab.
+  - **Raft Consensus (Event-Driven):** Leader elections, log replication, commit with Figure 8 rule, crash/restart/partition faults, 5 safety invariants, 60-seed fuzz test suite, mutation test suite.
+  - **Time-Travel Debugger Studio:** Interactive state machine studio, snapshot checkpoint inspection, history branching, fault injection, and replay verification.
+  - **JVM GC Visualizer:** Stop-the-world cell heap, mark-sweep vs generational collectors, nepotism floating garbage, fragmentation, leak-driven OOM, compare tab.
+- **Verification:** 158 unit tests passing, ESLint architecture rules clean, strict TypeScript clean.
+
 ## Contract v2 — Phase 2 (Proof Sims)
 
 **Migration note:** simulations now declare `kind: 'realtime' | 'batch'`.

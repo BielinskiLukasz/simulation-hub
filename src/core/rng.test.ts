@@ -13,6 +13,22 @@ describe('deriveSeed', () => {
   });
 });
 
+describe('Rng.state() capture (Contract v3)', () => {
+  it('a stream resumed from state() continues identically', () => {
+    const a = createRng(42);
+    const first = Array.from({ length: 50 }, () => a.next());
+    const resumed = createRng(999999, a.state());
+    const restA = Array.from({ length: 50 }, () => a.next());
+    const restB = Array.from({ length: 50 }, () => resumed.next());
+    expect(restB).toEqual(restA);
+    expect(first).not.toEqual(restA);
+    // resuming from a state captured at creation restarts the stream
+    const fresh = createRng(42);
+    const fromStart = createRng(7, fresh.state());
+    expect(Array.from({ length: 5 }, () => fromStart.next())).toEqual(Array.from({ length: 5 }, () => fresh.next()));
+  });
+});
+
 describe('createNormal (Box–Muller)', () => {
   it('mean ≈ 0 and variance ≈ 1 over 100k samples; same seed → same sequence', () => {
     const n = 100000;

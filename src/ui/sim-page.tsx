@@ -18,6 +18,10 @@ import { bindPointer } from './pointer';
 import { Controls } from './controls';
 import { BatchPage } from './batch-page';
 import { HudOverlay } from './hud';
+import { EventPage } from './event-page';
+import { mountGridEditor, type EditorHandle } from './grid-editor';
+import { exportJson, importJson } from '../core/grid/codec';
+import { TracePage } from './trace-page';
 
 const SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
 const WORLD = { w: 800, h: 600 };
@@ -52,9 +56,10 @@ export function SimPage({ entry, query, theme }: { entry: SimEntry; query: URLSe
       </main>
     );
   }
-  return sim.kind === 'batch'
-    ? <BatchPage entry={entry} sim={sim} query={query} theme={theme} />
-    : <RealtimePage entry={entry} sim={sim} query={query} theme={theme} />;
+  if (sim.kind === 'batch') return <BatchPage entry={entry} sim={sim} query={query} theme={theme} />;
+  if (sim.kind === 'event') return <EventPage entry={entry} sim={sim} query={query} theme={theme} />;
+  if (sim.kind === 'trace') return <TracePage entry={entry} sim={sim} query={query} theme={theme} />;
+  return <RealtimePage entry={entry} sim={sim} query={query} theme={theme} />;
 }
 
 function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: RealtimeSimulation<any, any>; query: URLSearchParams; theme: ThemeName }) {
@@ -68,6 +73,8 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
   const [stats, setStats] = useState({ steps: 0, time: 0, fps: 0 });
   const [runnerStats, setRunnerStats] = useState<RunnerStats | null>(null);
   const [simStats, setSimStats] = useState<Record<string, number | string>>({});
+  const editorHostRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<EditorHandle | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -81,6 +88,50 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
   const syncUrl = useCallback((p: Record<string, any>, s: number) => {
     history.replaceState(null, '', buildHash(entry.meta.id, encodeState(p, sim.defaultParams, s)));
   }, [entry.meta.id, sim]);
+
+  useEffect(() => {
+    if (!sim.editor || !sim.onEdit) return;
+    const host = editorHostRef.current;
+    const canvas = canvasRef.current;
+    if (!host || !canvas) return;
+    const ed = mountGridEditor(host, sim.editor, {
+      canvas,
+      cellAt: (clientX, clientY) => {
+        const st = runnerRef.current?.state as { w?: number; h?: number } | undefined;
+        if (!st?.w || !st.h) return null;
+        const rect = canvas.getBoundingClientRect();
+        const px = (clientX - rect.left) / Math.max(1, rect.width);
+        const py = (clientY - rect.top) / Math.max(1, rect.height);
+        if (px < 0 || py < 0 || px >= 1 || py >= 1) return null;
+        return { x: Math.floor(px * st.w), y: Math.floor(py * st.h) };
+      },
+      getTarget: () => {
+        const st = runnerRef.current?.state;
+        if (!st) return { w: 1, h: 1, cells: new Uint8Array(1) };
+        return sim.editor!.target(st);
+      },
+      onEdit: (edit) => { runnerRef.current?.edit(edit); return null; },
+      requestRender: () => runnerRef.current?.renderOnce(),
+      onExport: () => {
+        const st = runnerRef.current?.state;
+        if (!st) return;
+        const target = sim.editor!.target(st);
+        const blob = new Blob([exportJson(target, 0, target.cells.length - 1)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `${entry.meta.id}-grid.json`; a.click();
+        URL.revokeObjectURL(url);
+      },
+      onImport: (text) => {
+        const doc = importJson(text);
+        if (!doc) { alert('Import failed: not a valid grid JSON file.'); return; }
+        runnerRef.current?.edit({ op: 'replace', w: doc.w, h: doc.h, cells: doc.cells });
+      },
+      onCopyLink: () => { void navigator.clipboard.writeText(location.href); },
+    });
+    editorRef.current = ed;
+    return () => { ed.dispose(); editorRef.current = null; };
+  }, [sim]);
 
   useEffect(() => {
     let alive = true;
@@ -258,6 +309,7 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
               </div>
             </div>
 
+            {sim.editor && <div ref={editorHostRef} className="border-b border-slate-200 px-3 py-2 dark:border-white/10" />}
             <div ref={wrapRef} className="relative w-full bg-[#0b0f17]">
               <canvas ref={canvasRef} className="block w-full" style={{ aspectRatio: '4 / 3' }} aria-label={`${meta.title} canvas`} />
               <span className={`absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px] font-bold tracking-wider uppercase ${paused ? 'bg-amber-500/90 text-white' : 'bg-emerald-500/90 text-white'}`}>
@@ -322,6 +374,15 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
                 <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-[12px] text-emerald-800 dark:text-emerald-200">
                   <b>Tested invariant —</b> {sim.about.invariant}
                 </div>
+                {sim.concepts && (
+                  <div className="space-y-2 border-t border-slate-100 pt-3 dark:border-white/[.07]">
+                    {sim.concepts.split(/\n{2,}/).map((block, i) => {
+                      const t = block.trim();
+                      if (t.startsWith('## ')) return <h3 key={i} className="text-[13px] font-black text-slate-800 dark:text-white">{t.slice(3)}</h3>;
+                      return <p key={i} dangerouslySetInnerHTML={{ __html: t.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\*(.+?)\*/g, '<i>$1</i>').replace(/`(.+?)`/g, '<code class="font-mono text-[11px]">$1</code>') }} />;
+                    })}
+                  </div>
+                )}
                 <div>
                   <p className="mb-2 text-[11px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">Frame-rate independence</p>
                   <div className="grid grid-cols-3 gap-1.5 text-center font-mono text-[11px]">

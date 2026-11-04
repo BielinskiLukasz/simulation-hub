@@ -24,9 +24,9 @@ const THUMB_BALLS = [
 ];
 
 const ROADMAP = [
-  { title: 'Time-Travel Debugger', cat: 'Systems', desc: 'Event log + scrub-through-history replay for every sim.', icon: '◐', phase: 'Phase 3' },
   { title: 'Compare Mode', cat: 'Platform', desc: 'Two seeds / two param sets, side by side, diffed stats.', icon: '◧', phase: 'Phase 4' },
-  { title: 'Perf Recorder', cat: 'Platform', desc: 'Time-series metrics from getStats, exportable runs.', icon: '∿', phase: 'Phase 6' },
+  { title: 'Ecosystem & Spatial Agents', cat: 'Emergent', desc: 'Predator-prey food web, energy transfer & territorial emergence.', icon: '🌿', phase: 'Phase 5' },
+  { title: 'Perf Recorder & Dashboards', cat: 'Platform', desc: 'Time-series metrics from getStats, exportable multi-chart telemetry.', icon: '∿', phase: 'Phase 6' },
 ];
 
 export function Hub({ entries, onRandom }: { entries: SimEntry[]; onRandom: () => void }) {
@@ -50,15 +50,15 @@ export function Hub({ entries, onRandom }: { entries: SimEntry[]; onRandom: () =
       {/* ── hero ─────────────────────────────────────────────────────── */}
       <section className="pt-10 pb-8 text-center sm:pt-14">
         <span className="inline-flex items-center gap-2 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-[11px] font-bold tracking-widest text-amber-700 uppercase dark:text-amber-300">
-          <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-amber-500" /> Phase 1 · Contract v1 · live
+          <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-amber-500" /> Phase 3 · Contract v3 · live
         </span>
         <h1 className="mx-auto mt-5 max-w-3xl text-4xl font-black tracking-tight text-slate-900 sm:text-6xl dark:text-white">
           Simulation <span className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 bg-clip-text text-transparent">Hub</span>
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-[15px] leading-relaxed text-slate-500 sm:text-base dark:text-slate-400">
-          One trivial simulation, proving the whole platform: a pure plugin contract, a fixed-timestep
-          loop, seeded determinism, and state that lives in the URL. If Bouncing Balls works end-to-end,
-          every future sim is just a folder and one manifest line.
+          Fourteen simulations over three execution engines (real-time, batch, discrete-event):
+          Time-Travel Debugger studio, CPU scheduling, Raft consensus with fault injection, JVM garbage collection,
+          Monte Carlo with Web Workers, Boids flocking, and chaos physics — all seeded and deterministic.
         </p>
 
         {/* search */}
@@ -66,7 +66,7 @@ export function Hub({ entries, onRandom }: { entries: SimEntry[]; onRandom: () =
           <Search className="pointer-events-none absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-slate-400" />
           <input
             value={query} onChange={(e) => setQuery(e.target.value)} type="search" aria-label="Search simulations"
-            placeholder="Search simulations, tags… try “gravity”"
+            placeholder="Search simulations, tags… try “time-travel” or “raft”"
             className="w-full rounded-2xl border border-slate-300 bg-white py-3.5 pr-4 pl-12 text-[15px] text-slate-800 shadow-sm transition placeholder:text-slate-400 focus:border-amber-400 dark:border-white/15 dark:bg-white/[.06] dark:text-white"
           />
           {query && <span className="absolute top-1/2 right-4 -translate-y-1/2 font-mono text-[11px] text-slate-400">{visible.length} result{visible.length === 1 ? '' : 's'}</span>}
@@ -85,7 +85,7 @@ export function Hub({ entries, onRandom }: { entries: SimEntry[]; onRandom: () =
         {/* proof strip */}
         <div className="mx-auto mt-8 grid max-w-3xl grid-cols-2 gap-2 sm:grid-cols-4">
           {[
-            ['8', 'live simulations'], ['60 Hz', 'fixed timestep'], ['2 kinds', 'real-time + batch'], ['101', 'unit tests green'],
+            ['14', 'live simulations'], ['4 kinds', 'realtime, batch, event, trace'], ['Time-Travel', 'scrub, seek & branch'], ['210', 'unit tests green'],
           ].map(([v, l]) => (
             <div key={l} className="rounded-2xl border border-slate-200 bg-white px-3 py-3 dark:border-white/10 dark:bg-white/[.04]">
               <div className="text-xl font-black text-slate-900 dark:text-white">{v}</div>
@@ -285,11 +285,85 @@ function SimCard({ entry }: { entry: SimEntry }) {
             <line x1="16" y1="126" x2="284" y2="126" stroke="rgba(226,232,240,0.4)" strokeWidth="1.5" />
           </svg>
         )}
+        {m.thumbnail === 'cpu' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            <rect x="80" y="24" width="140" height="96" rx="10" fill="#0f172a" stroke="#38bdf8" strokeWidth="2" />
+            <rect x="110" y="44" width="80" height="56" rx="6" fill="rgba(56,189,248,0.25)" stroke="#38bdf8" strokeWidth="1.5" />
+            <text x="150" y="78" textAnchor="middle" fontSize="16" fontWeight="900" fill="#38bdf8" fontFamily="monospace">CPU</text>
+            {[-2, -1, 0, 1, 2].map((i) => (
+              <g key={i}>
+                <line x1={150 + i * 20} y1="12" x2={150 + i * 20} y2="24" stroke="#38bdf8" strokeWidth="2" />
+                <line x1={150 + i * 20} y1="120" x2={150 + i * 20} y2="132" stroke="#38bdf8" strokeWidth="2" />
+              </g>
+            ))}
+          </svg>
+        )}
+        {m.thumbnail === 'gc' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            {([[0,0,'#22c55e'],[1,0,'#22c55e'],[2,0,'#15803d'],[3,0,'#15803d'],[4,0,'#2563eb'],[5,0,'#2563eb'],[6,0,'#2563eb'],[7,0,'#2563eb'],
+               [0,1,'#22c55e'],[1,1,'#22c55e'],[2,1,'#15803d'],[3,1,'#c026d3'],[4,1,'#c026d3'],[5,1,'#2563eb'],[6,1,'#2563eb'],[7,1,'#2563eb'],
+               [0,2,'#22c55e'],[1,2,'#22c55e'],[2,2,'#15803d'],[3,2,'#c026d3'],[4,2,'#c026d3'],[5,2,'#2563eb'],[6,2,'#2563eb'],[7,2,'#2563eb']] as [number, number, string][]).map(([gx, gy, col], i) => (
+              <rect key={i} x={38 + gx * 28} y={28 + gy * 30} width="22" height="24" rx="4" fill={col} opacity="0.88" />
+            ))}
+            <line x1="148" y1="20" x2="148" y2="124" stroke="#f59e0b" strokeWidth="2" strokeDasharray="3 3" />
+          </svg>
+        )}
+        {m.thumbnail === 'debugger' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            <line x1="30" y1="74" x2="270" y2="74" stroke="rgba(244,63,94,0.4)" strokeWidth="4" strokeLinecap="round" />
+            <path d="M 120 74 Q 150 38 210 38 L 270 38" fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeDasharray="4 4" />
+            <circle cx="120" cy="74" r="6" fill="#f43f5e" />
+            <text x="120" y="94" textAnchor="middle" fontSize="9" fontWeight="800" fill="#f43f5e" fontFamily="monospace">BRANCH</text>
+            {[48, 84, 120, 165, 210, 255].map((cx, i) => (
+              <g key={i}>
+                <circle cx={cx} cy={74} r={cx === 165 ? 7 : 4} fill={cx === 165 ? '#38bdf8' : '#e2e8f0'} />
+                {cx === 165 && <line x1="165" y1="20" x2="165" y2="124" stroke="#38bdf8" strokeWidth="2" strokeDasharray="2 3" />}
+              </g>
+            ))}
+            <path d="M 64 36 L 48 48 L 64 60 Z M 82 36 L 66 48 L 82 60 Z" fill="#f43f5e" opacity="0.85" />
+            <text x="212" y="30" fontSize="10" fontWeight="700" fill="#f59e0b" fontFamily="monospace">ALT FUTURE</text>
+          </svg>
+        )}
+        {m.thumbnail === 'path' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            {Array.from({ length: 12 }).map((_, i) => (
+              <rect key={i} x={(i % 6) * 44 + 18} y={Math.floor(i / 6) * 58 + 20} width="40" height="54" rx="3" fill="#0f172a" stroke="rgba(148,163,184,0.25)" />
+            ))}
+            {[[38,42],[82,42],[126,42],[170,42],[214,42],[258,42],[258,96],[214,96],[170,96],[126,96],[82,96],[38,96]].map(([x,y],i) => (
+              <circle key={i} cx={x} cy={y} r="4" fill={i < 8 ? '#a78bfa' : '#f59e0b'} />
+            ))}
+            <circle cx="38" cy="42" r="8" fill="#22c55e" /><text x="38" y="45" textAnchor="middle" fontSize="9" fontWeight="900" fill="#052e16">S</text>
+            <circle cx="258" cy="96" r="8" fill="#f43f5e" /><text x="258" y="99" textAnchor="middle" fontSize="9" fontWeight="900" fill="#fff1f2">G</text>
+          </svg>
+        )}
+        {m.thumbnail === 'sand' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            <rect x="70" y="10" width="160" height="120" rx="6" fill="#0f172a" stroke="#f59e0b" strokeWidth="2" />
+            <path d="M95 22 H205 L175 66 H125 Z" fill="#fbbf24" opacity="0.9" />
+            <path d="M125 66 H175 L205 120 H95 Z" fill="#fbbf24" opacity="0.55" />
+            <rect x="150" y="112" width="24" height="8" fill="#64748b" />
+            <circle cx="120" cy="100" r="3" fill="#60a5fa" /><circle cx="180" cy="92" r="3" fill="#60a5fa" />
+            <circle cx="140" cy="108" r="2.5" fill="#ef4444" /><circle cx="196" cy="30" r="2" fill="#bfdbfe" />
+          </svg>
+        )}
+        {m.thumbnail === 'cache' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            {Array.from({ length: 16 }).map((_, i) => {
+              const row = Math.floor(i / 4);
+              const col = i % 4;
+              const hit = (row + col * 2) % 3 !== 0;
+              return <rect key={i} x={40 + col * 34 + Math.floor(row / 2) * 130} y={20 + (row % 2) * 54} width="30" height="50" rx="4" fill={hit ? '#22c55e' : '#ef4444'} opacity={0.35 + ((i * 37) % 60) / 100} />;
+            })}
+            <text x="40" y="140" fontSize="10" fill="#94a3b8" fontFamily="monospace">row-major 93.75%</text>
+            <text x="170" y="140" fontSize="10" fill="#94a3b8" fontFamily="monospace">col-major 0%</text>
+            <line x1="155" y1="16" x2="155" y2="120" stroke="rgba(148,163,184,0.4)" strokeDasharray="3 3" />
+          </svg>
+        )}
         <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-black tracking-wider text-white uppercase">
           <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-white" /> Live
         </span>
-        <span className={`absolute top-3 right-3 rounded-full px-2.5 py-1 text-[10px] font-black tracking-wider text-white uppercase ${m.kind === 'realtime' ? 'bg-sky-500' : 'bg-violet-500'}`}>
-          {m.kind === 'realtime' ? 'Real-time' : 'Analysis'}
+        <span className={`absolute top-3 right-3 rounded-full px-2.5 py-1 text-[10px] font-black tracking-wider text-white uppercase ${m.kind === 'realtime' ? 'bg-sky-500' : m.kind === 'event' ? 'bg-rose-500' : m.kind === 'trace' ? 'bg-violet-500' : 'bg-emerald-500'}`}>
+          {m.kind === 'realtime' ? 'Real-time' : m.kind === 'event' ? 'Event' : m.kind === 'trace' ? 'Trace' : 'Analysis'}
         </span>
         <span className="absolute right-3 bottom-3 rounded-md bg-black/50 px-2 py-1 font-mono text-[10px] text-slate-300">lazy chunk · import()</span>
       </div>

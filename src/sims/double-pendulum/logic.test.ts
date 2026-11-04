@@ -1,73 +1,63 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '../../core/rng';
-import { defaultParams, energy, init, snapshot, step, type Params, type State } from './logic';
+import { applyParams, bobPositions, defaultParams, energy, init, step, PIVOT, type Params, type State } from './logic';
 
-const DT = 1 / 60;
-
-function make(overrides: Partial<Params> = {}, seed = 8): State {
-  return init({ ...defaultParams, ...overrides }, createRng(seed));
+function run(params: Params, seed: number, steps: number): State {
+  const s = init(params, createRng(seed));
+  for (let i = 0; i < steps; i++) step(s, 1 / 60);
+  return s;
 }
 
-function run(state: State, steps: number): State {
-  for (let i = 0; i < steps; i++) step(state, DT);
-  return state;
-}
-
-describe('double-pendulum · determinism', () => {
-  it('same seed → bit-identical run after 900 steps', () => {
-    const a = run(make({ arms: 6 }, 12), 900);
-    const b = run(make({ arms: 6 }, 12), 900);
-    expect(snapshot(a)).toEqual(snapshot(b));
+describe('double-pendulum logic', () => {
+  it('determinism: same params + seed → identical angles after 600 steps', () => {
+    const a = run(defaultParams, 3, 600);
+    const b = run(defaultParams, 3, 600);
+    expect(a.main).toEqual(b.main);
+    expect(a.ghosts).toEqual(b.ghosts);
   });
 
-  it('different seeds diverge', () => {
-    const a = run(make({ arms: 3 }, 1), 300);
-    const b = run(make({ arms: 3 }, 2), 300);
-    expect(snapshot(a)).not.toEqual(snapshot(b));
-  });
-});
-
-describe('double-pendulum · physics', () => {
-  it('keeps total energy roughly constant with zero damping (RK4 quality check)', () => {
-    const state = make({ arms: 1, damping: 0, gravity: 9.8 }, 3);
-    const arm = state.arms[0]!;
-    const before = energy(arm, 9.8);
-    run(state, 2000);
-    const after = energy(arm, 9.8);
-    expect(Math.abs(after - before) / Math.abs(before)).toBeLessThan(0.05);
+  it('energy conserved to <1% over 10 s with damping = 0 (RK4)', () => {
+    const s = init(defaultParams, createRng(3));
+    const e0 = energy(s.main, s.params);
+    for (let i = 0; i < 600; i++) step(s, 1 / 60);
+    const e1 = energy(s.main, s.params);
+    expect(Math.abs(e1 - e0) / Math.abs(e0)).toBeLessThan(0.01);
   });
 
-  it('dissipates energy with damping', () => {
-    const state = make({ arms: 1, damping: 0.6 }, 3);
-    const arm = state.arms[0]!;
-    const before = energy(arm, state.params.gravity);
-    run(state, 1200);
-    expect(energy(arm, state.params.gravity)).toBeLessThan(before);
+  it('damping drains energy monotonically-ish and the pendulum settles downward', () => {
+    const s = run({ ...defaultParams, damping: 0.25, ghosts: 0 }, 3, 60 * 45);
+    const pos = bobPositions(s.main, s.params);
+    expect(pos.y2).toBeGreaterThan(PIVOT.y + 200); // bob hangs near the bottom
+    expect(Math.abs(s.main.w1)).toBeLessThan(0.5);
   });
 
-  it('never produces NaN even at high gravity', () => {
-    const state = run(make({ arms: 4, gravity: 30 }, 5), 3000);
-    for (const arm of state.arms) {
-      expect(Number.isFinite(arm.th1)).toBe(true);
-      expect(Number.isFinite(arm.th2)).toBe(true);
-      expect(Number.isFinite(arm.w1)).toBe(true);
-      expect(Number.isFinite(arm.w2)).toBe(true);
-    }
+  it('chaos: ghosts perturbed by 0.001 rad diverge from the main pendulum', () => {
+    const s = run({ ...defaultParams, ghosts: 5 }, 3, 60 * 25);
+    const main = bobPositions(s.main, s.params);
+    const distances = s.ghosts.map((g) => {
+      const gp = bobPositions(g, s.params);
+      return Math.hypot(gp.x2 - main.x2, gp.y2 - main.y2);
+    });
+    expect(Math.max(...distances)).toBeGreaterThan(80); // fully decorrelated
   });
 
-  it('is chaotic: a 0.01° difference grows into a macroscopic one', () => {
-    const a = run(make({ arms: 1, spread: 0 }, 1), 4200);
-    const b = run(make({ arms: 2, spread: 0.01 }, 1), 4200);
-    const armA = a.arms[0]!;
-    const armB = b.arms[1]!;
-    expect(Math.abs(Math.sin(armA.th2) - Math.sin(armB.th2))).toBeGreaterThan(0.1);
+  it('rest state: hanging straight down with zero velocity stays put', () => {
+    const s = run({ ...defaultParams, theta1: 0, theta2: 0, ghosts: 0 }, 3, 300);
+    expect(Math.abs(s.main.a1)).toBeLessThan(1e-9);
+    expect(Math.abs(s.main.a2)).toBeLessThan(1e-9);
   });
 
-  it('fills the trail ring buffer and never grows past its cap', () => {
-    const state = run(make({ arms: 2, trailLength: 60 }, 4), 500);
-    for (const arm of state.arms) {
-      expect(arm.count).toBe(60);
-      expect(arm.trail.length).toBe(120);
-    }
+  it('live applyParams: changing gravity does not reset the angles', () => {
+    const s = run(defaultParams, 3, 120);
+    const before = { ...s.main };
+    applyParams(s, { ...s.params, gravity: 400 });
+    expect(s.main).toEqual(before);
+    expect(s.params.gravity).toBe(400);
+  });
+
+  it('no NaN after 5,000 steps at extreme angles', () => {
+    const s = run({ ...defaultParams, theta1: 179, theta2: -179 }, 3, 5000);
+    expect(Number.isFinite(s.main.a1)).toBe(true);
+    expect(Number.isFinite(s.main.w2)).toBe(true);
   });
 });

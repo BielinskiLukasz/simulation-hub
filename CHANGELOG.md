@@ -20,12 +20,15 @@ executed through `WorkerPool` with progress + cancellation.
   canvas chart engine (fan bands, histogram, hover legend, theme-aware),
   KPI/progress/table kit, batch shell (200 ms debounce, abort, error keeps
   last result).
-- Sims: **Boids** (SoA, spatial hash, predators/obstacles, live steering,
+- Sims: **Game of Life** (cellular automaton, seeded patterns, pointer painting, wrap edges — promoted from the hub roadmap),
+  **Double Pendulum** (RK4 chaos, ghost-pendulum divergence, energy-tested), **Raft Consensus**
+  (elections, log replication, majority commit, crashable nodes — safety-tested), **Monte Carlo π**
+  (chunked estimation with convergence band) — all three promoted from the hub roadmap, **Boids** (SoA, spatial hash, predators/obstacles, live steering,
   8 tests + bench), **Monte Carlo portfolio** (deterministic 1,000-run
   chunks; closed-form + mean-matching tests; fan chart, histogram,
   depletion), **Tax wrappers IKE/IKZE** (rules as sourced data with
   `asOf`; five hand-calculated fixture scenarios).
-- 76 unit tests, all green; hub imports meta only, sims stay lazy chunks.
+- 101 unit tests, all green; hub imports meta only, sims stay lazy chunks.
 
 ## Contract v1 — Phase 1 (Platform Foundation)
 

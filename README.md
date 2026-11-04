@@ -10,6 +10,10 @@ different workloads under **Contract v2**:
 | Boids Flocking | realtime | SoA typed arrays, spatial hash, 10k agents, predators |
 | Monte Carlo Portfolio | batch (workers) | deterministic chunked jobs, fan chart, cancellation |
 | Tax Wrappers (IKE/IKZE) | batch (inline) | rules-as-data with sources, hand-calculated tests |
+| Game of Life | realtime | cellular automata, seeded patterns, paint-on-canvas |
+| Double Pendulum | realtime | RK4 chaos, ghost divergence, energy conservation |
+| Raft Consensus | realtime | elections, log replication, crash/revive nodes |
+| Monte Carlo π | batch | chunked estimation, 1/√N convergence band |
 
 Press **P** in any realtime sim for the perf HUD. Every sim is reproducible
 from its URL: `#/sim/monte-carlo?seed=7&runs=20000`, `#/sim/boids?count=5000`.

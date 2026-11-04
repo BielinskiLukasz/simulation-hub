@@ -1,100 +1,64 @@
-import type { RenderContext } from '../../core/types';
-import { bob2, energy, type Arm, type State } from './logic';
+// ─── Double Pendulum · render.ts — trail, ghosts, main linkage ─────────────
 
-export function armColor(index: number, total: number, arm: Arm, state: State, theme: 'light' | 'dark'): string {
-  const light = theme === 'dark' ? 62 : 47;
-  switch (state.params.palette) {
-    case 'mono':
-      return state.params.color;
-    case 'energy': {
-      const e = Math.min(Math.abs(energy(arm, state.params.gravity)) / 40, 1);
-      return `hsl(${(168 - e * 145).toFixed(1)} 88% ${light}%)`;
-    }
-    case 'fan':
-    default: {
-      const hue = total > 1 ? 12 + (index / (total - 1)) * 190 : 22;
-      return `hsl(${hue.toFixed(1)} 86% ${light}%)`;
-    }
-  }
-}
+import type { RenderContext } from '../../core/types';
+import { PIVOT, bobPositions, type State } from './logic';
 
 export function render(state: State, rc: RenderContext): void {
   const { ctx, width, height, theme } = rc;
   const dark = theme === 'dark';
-  const { params } = state;
-
-  ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = dark ? '#0a0e13' : '#f4f6f8';
+  ctx.fillStyle = dark ? '#0d0a12' : '#faf7fb';
   ctx.fillRect(0, 0, width, height);
 
-  const pivotX = width / 2;
-  const pivotY = height * 0.34;
-  const scale = params.length;
-  const total = state.arms.length;
+  const p = state.params;
 
-  // pivot cross-hair
-  ctx.strokeStyle = dark ? 'rgba(233,238,243,0.16)' : 'rgba(16,24,32,0.16)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(pivotX - 26, pivotY);
-  ctx.lineTo(pivotX + 26, pivotY);
-  ctx.moveTo(pivotX, pivotY - 26);
-  ctx.lineTo(pivotX, pivotY + 26);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(pivotX, pivotY, scale * 2, 0, Math.PI * 2);
-  ctx.strokeStyle = dark ? 'rgba(233,238,243,0.07)' : 'rgba(16,24,32,0.07)';
-  ctx.stroke();
-
-  state.arms.forEach((arm, i) => {
-    const color = armColor(i, total, arm, state, theme);
-
-    if (params.trail && arm.count > 2) {
-      const cap = arm.trail.length / 2;
-      const CHUNKS = 5;
-      for (let c = 0; c < CHUNKS; c++) {
-        const from = Math.floor((arm.count * c) / CHUNKS);
-        const to = Math.floor((arm.count * (c + 1)) / CHUNKS);
-        ctx.globalAlpha = 0.05 + (c / CHUNKS) * 0.5;
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1 + c * 0.28;
-        ctx.beginPath();
-        for (let k = from; k < to; k++) {
-          const idx = ((arm.head - arm.count + k + cap * 2) % cap) * 2;
-          const x = pivotX + arm.trail[idx]! * scale;
-          const y = pivotY + arm.trail[idx + 1]! * scale;
-          if (k === from) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
+  // trail (oldest → newest, fading)
+  if (p.trail && state.trailCount > 1) {
+    ctx.lineWidth = 1.6;
+    const n = state.trailCount;
+    for (let i = 1; i < n; i++) {
+      const idxA = (state.trailHead - i + state.trailX.length * 2) % state.trailX.length;
+      const idxB = (state.trailHead - i - 1 + state.trailX.length * 2) % state.trailX.length;
+      const t = 1 - i / n;
+      ctx.strokeStyle = `hsla(340 85% ${dark ? 65 : 55}% / ${t * 0.55})`;
+      ctx.beginPath();
+      ctx.moveTo(state.trailX[idxB]!, state.trailY[idxB]!);
+      ctx.lineTo(state.trailX[idxA]!, state.trailY[idxA]!);
+      ctx.stroke();
     }
+  }
 
-    const x1 = pivotX + Math.sin(arm.th1) * scale;
-    const y1 = pivotY + Math.cos(arm.th1) * scale;
-    const bob = bob2(arm);
-    const x2 = pivotX + bob.x * scale;
-    const y2 = pivotY + bob.y * scale;
-
-    ctx.strokeStyle = color;
-    ctx.globalAlpha = total > 16 ? 0.5 : 0.85;
-    ctx.lineWidth = total > 16 ? 1 : 1.8;
+  // ghosts: faint rods + bobs — watch them diverge from the main pendulum
+  for (const g of state.ghosts) {
+    const pos = bobPositions(g, p);
+    ctx.strokeStyle = dark ? 'rgba(148,163,184,0.35)' : 'rgba(100,116,139,0.35)';
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(pivotX, pivotY);
-    ctx.lineTo(x1, y1);
-    ctx.lineTo(x2, y2);
+    ctx.moveTo(PIVOT.x, PIVOT.y);
+    ctx.lineTo(pos.x1, pos.y1);
+    ctx.lineTo(pos.x2, pos.y2);
     ctx.stroke();
-    ctx.globalAlpha = 1;
+    ctx.fillStyle = dark ? 'rgba(226,232,240,0.5)' : 'rgba(71,85,105,0.5)';
+    ctx.beginPath(); ctx.arc(pos.x2, pos.y2, 4, 0, Math.PI * 2); ctx.fill();
+  }
 
-    const r = total > 16 ? 2.4 : 4.2;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(x2, y2, r, 0, Math.PI * 2);
-    ctx.fill();
-  });
+  // main linkage
+  const pos = bobPositions(state.main, p);
+  ctx.strokeStyle = dark ? '#e2e8f0' : '#334155';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(PIVOT.x, PIVOT.y);
+  ctx.lineTo(pos.x1, pos.y1);
+  ctx.lineTo(pos.x2, pos.y2);
+  ctx.stroke();
 
-  ctx.strokeStyle = dark ? 'rgba(255,138,61,0.45)' : 'rgba(217,86,12,0.4)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(1, 1, width - 2, height - 2);
+  ctx.fillStyle = dark ? '#f8fafc' : '#0f172a';
+  ctx.beginPath(); ctx.arc(PIVOT.x, PIVOT.y, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fb7185';
+  ctx.beginPath(); ctx.arc(pos.x1, pos.y1, 10, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#f43f5e';
+  ctx.beginPath(); ctx.arc(pos.x2, pos.y2, 8, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.beginPath(); ctx.arc(pos.x1 - 3, pos.y1 - 3, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(pos.x2 - 2.5, pos.y2 - 2.5, 2.4, 0, Math.PI * 2); ctx.fill();
 }

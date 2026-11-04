@@ -267,7 +267,7 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
               <span className="absolute right-3 bottom-3 rounded-md bg-black/45 px-2 py-1 font-mono text-[10px] text-slate-300">world 800 × 600 · fixed dt 1/60</span>
               {sim.onPointer && (
                 <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-md bg-black/45 px-2 py-1 font-mono text-[10px] text-slate-300">
-                  <MousePointer2 className="h-3 w-3" /> {meta.id === 'boids' ? 'click/drag spawn · shift predator · alt obstacle · right-click remove' : 'click canvas to spawn'}
+                  <MousePointer2 className="h-3 w-3" /> {meta.id === 'boids' ? 'click/drag spawn · shift predator · alt obstacle · right-click remove' : meta.id === 'game-of-life' ? 'click/drag paints cells · shift erases' : meta.id === 'double-pendulum' ? 'click/drag aims the pendulum · release from rest' : meta.id === 'raft' ? 'click node = crash/revive · shift+click forces election' : 'click canvas to spawn'}
                 </span>
               )}
             </div>

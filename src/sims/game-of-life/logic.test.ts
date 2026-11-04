@@ -1,124 +1,81 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '../../core/rng';
-import { defaultParams, generation, init, step, type Params, type State } from './logic';
+import { defaultParams, init, onPointer, step, type Params, type State } from './logic';
 
-function make(overrides: Partial<Params> = {}, seed = 99): State {
-  return init({ ...defaultParams, ...overrides }, createRng(seed));
+function empty(params: Partial<Params> = {}): State {
+  const s = init({ ...defaultParams, pattern: 'glider', cellSize: 10, ...params }, createRng(1));
+  s.cells.fill(0); s.age.fill(0); s.alive = 0; s.generation = 0;
+  return s;
 }
+function set(s: State, x: number, y: number): void {
+  s.cells[y * s.cols + x] = 1;
+  s.age[y * s.cols + x] = 1;
+  s.alive++;
+}
+const liveCells = (s: State): string[] => {
+  const out: string[] = [];
+  for (let y = 0; y < s.rows; y++) for (let x = 0; x < s.cols; x++) if (s.cells[y * s.cols + x] === 1) out.push(`${x},${y}`);
+  return out.sort();
+};
 
-function aliveSet(state: State): number[] {
-  const out: number[] = [];
-  state.cells.forEach((v, i) => {
-    if (v === 1) out.push(i);
+describe('game-of-life logic', () => {
+  it('block is a still life (stable forever)', () => {
+    const s = empty();
+    set(s, 5, 5); set(s, 6, 5); set(s, 5, 6); set(s, 6, 6);
+    const before = liveCells(s);
+    for (let i = 0; i < 10; i++) step(s, 1 / 60);
+    expect(liveCells(s)).toEqual(before);
+    expect(s.generation).toBe(10);
   });
-  return out;
-}
 
-function set(state: State, x: number, y: number, v = 1): void {
-  state.cells[y * state.cols + x] = v;
-}
-function get(state: State, x: number, y: number): number {
-  return state.cells[y * state.cols + x]!;
-}
+  it('blinker oscillates with period 2', () => {
+    const s = empty();
+    set(s, 10, 10); set(s, 11, 10); set(s, 12, 10);
+    const horizontal = liveCells(s);
+    step(s, 1 / 60);
+    expect(liveCells(s)).toEqual(['11,9', '11,10', '11,11'].sort());
+    step(s, 1 / 60);
+    expect(liveCells(s)).toEqual(horizontal);
+  });
 
-describe('game-of-life · determinism', () => {
-  it('same seed + params → identical grid after 120 generations', () => {
-    const a = make({ cell: 10 }, 5);
-    const b = make({ cell: 10 }, 5);
-    for (let i = 0; i < 120; i++) {
-      generation(a);
-      generation(b);
-    }
+  it('glider translates by (+1,+1) after 4 generations', () => {
+    const s = empty();
+    // glider at (5,5): relative cells (1,0),(2,1),(0,2),(1,2),(2,2)
+    set(s, 6, 5); set(s, 7, 6); set(s, 5, 7); set(s, 6, 7); set(s, 7, 7);
+    for (let i = 0; i < 4; i++) step(s, 1 / 60);
+    expect(liveCells(s)).toEqual(['6,8', '7,6', '7,8', '8,7', '8,8'].sort());
+  });
+
+  it('determinism: same seed soup → identical grids after 200 generations', () => {
+    const a = init(defaultParams, createRng(42));
+    const b = init(defaultParams, createRng(42));
+    for (let i = 0; i < 200; i++) { step(a, 1 / 60); step(b, 1 / 60); }
     expect(Array.from(a.cells)).toEqual(Array.from(b.cells));
-    expect(a.gen).toBe(b.gen);
+    const c = init(defaultParams, createRng(43));
+    for (let i = 0; i < 200; i++) step(c, 1 / 60);
+    expect(Array.from(c.cells)).not.toEqual(Array.from(a.cells));
   });
 
-  it('different seeds diverge', () => {
-    const a = make({}, 1);
-    const b = make({}, 2);
-    for (let i = 0; i < 20; i++) {
-      generation(a);
-      generation(b);
-    }
-    expect(Array.from(a.cells)).not.toEqual(Array.from(b.cells));
+  it('wrap: a blinker straddling the edge still oscillates on the torus', () => {
+    const s = empty({ wrap: true });
+    set(s, s.cols - 1, 10); set(s, 0, 10); set(s, 1, 10);
+    const before = liveCells(s);
+    step(s, 1 / 60); step(s, 1 / 60);
+    expect(liveCells(s)).toEqual(before);
   });
 
-  it('cell size decides the grid dimensions', () => {
-    expect(make({ cell: 8 }).cols).toBe(100);
-    expect(make({ cell: 8 }).rows).toBe(75);
-  });
-});
-
-describe('game-of-life · B3/S23 invariants', () => {
-  it('an empty grid stays empty', () => {
-    const state = make({ density: 0.02 }, 3);
-    state.cells.fill(0);
-    generation(state);
-    expect(state.alive).toBe(0);
+  it('onPointer paints and erases cells at world coordinates', () => {
+    const s = empty();
+    onPointer(s, { type: 'down', x: 105, y: 205, button: 0, shift: false, alt: false, pressed: true });
+    expect(s.cells[20 * s.cols + 10]).toBe(1);
+    onPointer(s, { type: 'down', x: 105, y: 205, button: 0, shift: true, alt: false, pressed: true });
+    expect(s.cells[20 * s.cols + 10]).toBe(0);
   });
 
-  it('a block is a still life', () => {
-    const state = make({}, 3);
-    state.cells.fill(0);
-    set(state, 10, 10);
-    set(state, 11, 10);
-    set(state, 10, 11);
-    set(state, 11, 11);
-    generation(state);
-    expect(aliveSet(state)).toEqual([10 + 10 * state.cols, 11 + 10 * state.cols, 10 + 11 * state.cols, 11 + 11 * state.cols].sort((p, q) => p - q));
-  });
-
-  it('a blinker has period 2', () => {
-    const state = make({}, 3);
-    state.cells.fill(0);
-    set(state, 10, 9);
-    set(state, 10, 10);
-    set(state, 10, 11);
-    generation(state);
-    expect([get(state, 9, 10), get(state, 10, 10), get(state, 11, 10)]).toEqual([1, 1, 1]);
-    expect(state.alive).toBe(3);
-    generation(state);
-    expect([get(state, 10, 9), get(state, 10, 10), get(state, 10, 11)]).toEqual([1, 1, 1]);
-  });
-
-  it('a lone cell dies of loneliness', () => {
-    const state = make({}, 3);
-    state.cells.fill(0);
-    set(state, 20, 20);
-    generation(state);
-    expect(get(state, 20, 20)).toBe(0);
-  });
-
-  it('alive count always stays inside [0, cols*rows] and never goes NaN', () => {
-    const state = make({ density: 0.5, rule: 'highlife' }, 21);
-    for (let i = 0; i < 200; i++) {
-      step(state, 1 / 60);
-      expect(state.alive).toBeGreaterThanOrEqual(0);
-      expect(state.alive).toBeLessThanOrEqual(state.cols * state.rows);
-      expect(Number.isFinite(state.acc)).toBe(true);
-    }
-  });
-
-  it('wraps around the torus instead of dying at the border', () => {
-    const state = make({}, 3);
-    state.cells.fill(0);
-    const y = 0;
-    set(state, state.cols - 1, y);
-    set(state, 0, y);
-    set(state, 1, y);
-    generation(state);
-    // the wrapped horizontal blinker must flip to vertical at all three columns
-    expect(get(state, 0, state.rows - 1)).toBe(1);
-    expect(get(state, 0, 1)).toBe(1);
-  });
-});
-
-describe('game-of-life · timing', () => {
-  it('emits whole generations only, at the configured rate', () => {
-    const state = make({ rate: 10 }, 4);
-    step(state, 1 / 60); // 16 ms of a 100 ms generation
-    expect(state.gen).toBe(0);
-    step(state, 0.1);
-    expect(state.gen).toBe(1);
+  it('underpopulation: a lone cell dies', () => {
+    const s = empty();
+    set(s, 20, 20);
+    step(s, 1 / 60);
+    expect(s.alive).toBe(0);
   });
 });

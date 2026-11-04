@@ -24,10 +24,9 @@ const THUMB_BALLS = [
 ];
 
 const ROADMAP = [
-  { title: 'Game of Life', cat: 'Emergent', desc: 'Cellular automata, hash-life patterns and a metrics HUD.', icon: '▦' },
-  { title: 'Double Pendulum', cat: 'Physics', desc: 'Chaos, sensitivity to initial conditions, trace trails.', icon: '◎' },
-  { title: 'Raft Consensus', cat: 'Systems', desc: 'Discrete-event engine, event log, time-travel — Phase 3.', icon: '⬡' },
-  { title: 'Monte Carlo π', cat: 'Algorithms', desc: 'Batch-job sim shape: no per-frame render, pure statistics.', icon: 'π' },
+  { title: 'Time-Travel Debugger', cat: 'Systems', desc: 'Event log + scrub-through-history replay for every sim.', icon: '◐', phase: 'Phase 3' },
+  { title: 'Compare Mode', cat: 'Platform', desc: 'Two seeds / two param sets, side by side, diffed stats.', icon: '◧', phase: 'Phase 4' },
+  { title: 'Perf Recorder', cat: 'Platform', desc: 'Time-series metrics from getStats, exportable runs.', icon: '∿', phase: 'Phase 6' },
 ];
 
 export function Hub({ entries, onRandom }: { entries: SimEntry[]; onRandom: () => void }) {
@@ -86,7 +85,7 @@ export function Hub({ entries, onRandom }: { entries: SimEntry[]; onRandom: () =
         {/* proof strip */}
         <div className="mx-auto mt-8 grid max-w-3xl grid-cols-2 gap-2 sm:grid-cols-4">
           {[
-            ['4', 'live simulations'], ['60 Hz', 'fixed timestep'], ['2 kinds', 'real-time + batch'], ['76', 'unit tests green'],
+            ['8', 'live simulations'], ['60 Hz', 'fixed timestep'], ['2 kinds', 'real-time + batch'], ['101', 'unit tests green'],
           ].map(([v, l]) => (
             <div key={l} className="rounded-2xl border border-slate-200 bg-white px-3 py-3 dark:border-white/10 dark:bg-white/[.04]">
               <div className="text-xl font-black text-slate-900 dark:text-white">{v}</div>
@@ -225,6 +224,48 @@ function SimCard({ entry }: { entry: SimEntry }) {
             ))}
           </svg>
         )}
+        {m.thumbnail === 'life' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            {([[0,0],[1,0],[0,1],[1,1],[4,1],[5,2],[3,3],[4,3],[5,3],[8,0],[9,0],[8,1],[9,1]] as [number, number][]).map(([cx, cy], i) => (
+              <rect key={i} x={26 + cx * 26} y={22 + cy * 26} width="22" height="22" rx="4" fill={i % 3 === 0 ? '#4ade80' : i % 3 === 1 ? '#22c55e' : '#86efac'} opacity="0.9" />
+            ))}
+            <path d="M 210 118 l 12 -8 l 2 10 l 10 2 l -9 6 l 3 10 l -11 -6 l -9 6 l 2 -11 Z" fill="#bbf7d0" opacity="0.85" />
+          </svg>
+        )}
+        {m.thumbnail === 'pendulum' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            <path d="M60 118 A 105 105 0 0 1 240 30" fill="none" stroke="rgba(251,113,133,0.35)" strokeWidth="10" strokeLinecap="round" />
+            <line x1="150" y1="18" x2="196" y2="86" stroke="#e2e8f0" strokeWidth="3" />
+            <line x1="196" y1="86" x2="238" y2="66" stroke="#e2e8f0" strokeWidth="3" />
+            <circle cx="150" cy="18" r="5" fill="#f8fafc" />
+            <circle cx="196" cy="86" r="9" fill="#fb7185" />
+            <circle cx="238" cy="66" r="7" fill="#f43f5e" />
+            <path d="M238 66 q 26 10 18 34 q -6 18 -26 16" fill="none" stroke="rgba(251,113,133,0.6)" strokeWidth="2" strokeDasharray="3 4" />
+          </svg>
+        )}
+        {m.thumbnail === 'raft' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            {([[150, 26], [218, 66], [196, 122], [104, 122], [82, 66]] as [number, number][]).map(([cx, cy], i) => (
+              <g key={i}>
+                <circle cx={cx} cy={cy} r="17" fill={i === 0 ? '#f59e0b' : '#38bdf8'} opacity="0.92" />
+                <text x={cx} y={cy + 4} textAnchor="middle" fontSize="10" fontWeight="800" fill="#0b0f17" fontFamily="monospace">N{i}</text>
+              </g>
+            ))}
+            <circle cx="184" cy="46" r="3.5" fill="#fbbf24" />
+            <circle cx="128" cy="96" r="3.5" fill="#34d399" />
+            <circle cx="160" cy="116" r="3.5" fill="#fb7185" />
+          </svg>
+        )}
+        {m.thumbnail === 'pi' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            <rect x="86" y="14" width="128" height="116" fill="none" stroke="rgba(226,232,240,0.55)" strokeWidth="2" />
+            <circle cx="86" cy="130" r="128" fill="rgba(56,189,248,0.16)" stroke="#38bdf8" strokeWidth="2" />
+            {([[110, 40], [150, 70], [190, 36], [128, 104], [176, 112], [204, 92], [98, 76], [160, 22]] as [number, number][]).map(([cx, cy], i) => (
+              <circle key={i} cx={cx} cy={cy} r="3.4" fill={i % 3 === 0 ? '#f59e0b' : '#7dd3fc'} />
+            ))}
+            <text x="238" y="76" fontSize="34" fill="#e2e8f0" fontFamily="serif" fontStyle="italic">π</text>
+          </svg>
+        )}
         {m.thumbnail === 'fan' && (
           <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
             <path d="M10 118 C 90 108, 180 74, 290 26 L 290 96 C 180 122, 90 128, 10 124 Z" fill="rgba(52,211,153,0.20)" />
@@ -272,7 +313,7 @@ function SimCard({ entry }: { entry: SimEntry }) {
   );
 }
 
-function RoadmapCard({ title, cat, desc, icon }: { title: string; cat: string; desc: string; icon: string }) {
+function RoadmapCard({ title, cat, desc, icon, phase }: { title: string; cat: string; desc: string; icon: string; phase: string }) {
   return (
     <article aria-disabled className="flex flex-col overflow-hidden rounded-3xl border border-dashed border-slate-300 bg-slate-50/60 dark:border-white/15 dark:bg-white/[.02]">
       <div className="flex h-36 items-center justify-center bg-slate-900/[.03] dark:bg-white/[.03]">
@@ -282,7 +323,7 @@ function RoadmapCard({ title, cat, desc, icon }: { title: string; cat: string; d
         <div className="flex items-center gap-2">
           <h3 className="font-black text-slate-500 dark:text-slate-400">{title}</h3>
           <span className="ml-auto rounded-full bg-slate-900/[.06] px-2 py-0.5 text-[10px] font-black tracking-wide text-slate-400 uppercase dark:bg-white/10">{cat}</span>
-          <span className="rounded-full border border-slate-300 px-2 py-0.5 text-[10px] font-black tracking-wide text-slate-400 uppercase dark:border-white/20">Phase 2</span>
+          <span className="rounded-full border border-slate-300 px-2 py-0.5 text-[10px] font-black tracking-wide text-slate-400 uppercase dark:border-white/20">{phase}</span>
         </div>
         <p className="mt-2 text-[13px] leading-relaxed text-slate-400 dark:text-slate-500">{desc}</p>
         <span className="mt-4 inline-flex items-center gap-1 text-[12px] font-bold text-slate-400">Planned — plugs into Contract v1 <ArrowUpRight className="h-3.5 w-3.5" /></span>

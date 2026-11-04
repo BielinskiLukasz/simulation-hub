@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '../../core/rng';
-import { defaultParams, init, kineticEnergy, step, WORLD, type Params, type State } from './logic';
+import { applyParams, defaultParams, init, kineticEnergy, onPointer, step, WORLD, type Params, type State } from './logic';
 
 function run(params: Params, seed: number, steps: number): State {
   let s = init(params, createRng(seed));
@@ -36,5 +36,22 @@ describe('bouncing-balls logic', () => {
     let s = init(p, createRng(5)); const e0 = kineticEnergy(s);
     for (let i = 0; i < 1000; i++) s = step(s, 1 / 60);
     expect(kineticEnergy(s)).toBeLessThan(e0);
+  });
+
+  it('v2 applyParams: changing gravity mid-run does not move any ball', () => {
+    const s = run(defaultParams, 42, 120);
+    const before = s.balls.map((b) => ({ x: b.x, y: b.y }));
+    applyParams(s, { ...defaultParams, gravity: 0 });
+    expect(s.balls.map((b) => ({ x: b.x, y: b.y }))).toEqual(before);
+    expect(s.params.gravity).toBe(0);
+  });
+
+  it('v2 onPointer: click spawns a ball at the cursor', () => {
+    const s = init(defaultParams, createRng(1));
+    const n0 = s.balls.length;
+    onPointer(s, { type: 'down', x: 123, y: 234, button: 0, shift: false, alt: false, pressed: true });
+    expect(s.balls.length).toBe(n0 + 1);
+    expect(s.balls[n0]!.x).toBeCloseTo(123, 1);
+    expect(s.balls[n0]!.y).toBeCloseTo(234, 1);
   });
 });

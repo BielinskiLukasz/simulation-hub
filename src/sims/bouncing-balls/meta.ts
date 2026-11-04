@@ -6,6 +6,7 @@ import type { SimMeta } from '../../core/types';
 export const meta: SimMeta = {
   id: 'bouncing-balls',
   title: 'Bouncing Balls',
+  kind: 'realtime',
   category: 'physics',
   description:
     'The Phase-1 proof sim: gravity, restitution and optional elastic collisions in a fixed 800×600 world. Every control type in the schema is exercised — and every run is reproducible from its seed.',

@@ -1,8 +1,18 @@
 # Simulation Hub
 
-**Phase 1 — Platform Foundation.** A deployed hub with one trivial simulation
-(Bouncing Balls) that proves the plugin contract, the fixed-timestep game loop,
-URL state, seeded determinism, and the CI/CD pipeline end to end.
+**Phase 2 — Proof Sims.** The Phase-1 platform (plugin contract, fixed-timestep
+loop, URL state, seeded determinism, CI/CD) now stress-tested by three very
+different workloads under **Contract v2**:
+
+| Sim | Kind | Stresses |
+|---|---|---|
+| Bouncing Balls | realtime | the v1→v2 migration (live params, pointer spawn, HUD) |
+| Boids Flocking | realtime | SoA typed arrays, spatial hash, 10k agents, predators |
+| Monte Carlo Portfolio | batch (workers) | deterministic chunked jobs, fan chart, cancellation |
+| Tax Wrappers (IKE/IKZE) | batch (inline) | rules-as-data with sources, hand-calculated tests |
+
+Press **P** in any realtime sim for the perf HUD. Every sim is reproducible
+from its URL: `#/sim/monte-carlo?seed=7&runs=20000`, `#/sim/boids?count=5000`.
 
 **Live demo:** `https://bielinskilukasz.github.io/simulation-hub/`
 

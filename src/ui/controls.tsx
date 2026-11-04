@@ -26,7 +26,7 @@ export function Controls<P extends Record<string, any>>({ schema, params, onChan
             {def.kind === 'range' && (
               <>
                 <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                  <label htmlFor={id} className="text-[13px] font-semibold text-slate-700 dark:text-slate-200">{def.label}</label>
+                  <label htmlFor={id} className="text-[13px] font-semibold text-slate-700 dark:text-slate-200">{def.label}{def.live && <span className="ml-1.5 rounded bg-emerald-500/15 px-1 py-px align-middle font-mono text-[9px] font-bold tracking-wide text-emerald-600 uppercase dark:text-emerald-400">live</span>}</label>
                   <span className="rounded-md bg-slate-900/[.05] px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-200">
                     {typeof value === 'number' ? trimNum(value) : String(value)}{def.unit ? ` ${def.unit}` : ''}
                   </span>
@@ -45,7 +45,7 @@ export function Controls<P extends Record<string, any>>({ schema, params, onChan
 
             {def.kind === 'number' && (
               <>
-                <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-slate-700 dark:text-slate-200">{def.label}</label>
+                <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-slate-700 dark:text-slate-200">{def.label}{def.live && <span className="ml-1.5 rounded bg-emerald-500/15 px-1 py-px align-middle font-mono text-[9px] font-bold tracking-wide text-emerald-600 uppercase dark:text-emerald-400">live</span>}</label>
                 <div className="flex items-center gap-2">
                   <input
                     id={id} type="number" min={def.min} max={def.max} step={def.step ?? 1} value={Number(value)}
@@ -59,7 +59,7 @@ export function Controls<P extends Record<string, any>>({ schema, params, onChan
 
             {def.kind === 'boolean' && (
               <div className="flex items-center justify-between gap-3">
-                <label htmlFor={id} className="text-[13px] font-semibold text-slate-700 dark:text-slate-200">{def.label}</label>
+                <label htmlFor={id} className="text-[13px] font-semibold text-slate-700 dark:text-slate-200">{def.label}{def.live && <span className="ml-1.5 rounded bg-emerald-500/15 px-1 py-px align-middle font-mono text-[9px] font-bold tracking-wide text-emerald-600 uppercase dark:text-emerald-400">live</span>}</label>
                 <button
                   id={id} type="button" role="switch" aria-checked={Boolean(value)} aria-label={def.label}
                   onClick={() => onChange(key, !value as P[keyof P])}
@@ -72,7 +72,7 @@ export function Controls<P extends Record<string, any>>({ schema, params, onChan
 
             {def.kind === 'select' && (
               <>
-                <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-slate-700 dark:text-slate-200">{def.label}</label>
+                <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-slate-700 dark:text-slate-200">{def.label}{def.live && <span className="ml-1.5 rounded bg-emerald-500/15 px-1 py-px align-middle font-mono text-[9px] font-bold tracking-wide text-emerald-600 uppercase dark:text-emerald-400">live</span>}</label>
                 <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-900/[.05] p-1 dark:bg-white/[.07]" role="group" aria-label={def.label}>
                   {def.options.map((opt) => (
                     <button
@@ -87,7 +87,7 @@ export function Controls<P extends Record<string, any>>({ schema, params, onChan
 
             {def.kind === 'color' && (
               <>
-                <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-slate-700 dark:text-slate-200">{def.label}</label>
+                <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-slate-700 dark:text-slate-200">{def.label}{def.live && <span className="ml-1.5 rounded bg-emerald-500/15 px-1 py-px align-middle font-mono text-[9px] font-bold tracking-wide text-emerald-600 uppercase dark:text-emerald-400">live</span>}</label>
                 <div className="flex items-center gap-2.5">
                   <input
                     id={id} type="color" value={String(value)}

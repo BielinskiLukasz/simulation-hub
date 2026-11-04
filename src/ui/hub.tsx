@@ -25,8 +25,8 @@ const THUMB_BALLS = [
 
 const ROADMAP = [
   { title: 'Game of Life', cat: 'Emergent', desc: 'Cellular automata, hash-life patterns and a metrics HUD.', icon: '▦' },
-  { title: 'Boids Flocking', cat: 'Emergent', desc: '5k agents, spatial hashing — the mutate-vs-copy stress test.', icon: '≋' },
   { title: 'Double Pendulum', cat: 'Physics', desc: 'Chaos, sensitivity to initial conditions, trace trails.', icon: '◎' },
+  { title: 'Raft Consensus', cat: 'Systems', desc: 'Discrete-event engine, event log, time-travel — Phase 3.', icon: '⬡' },
   { title: 'Monte Carlo π', cat: 'Algorithms', desc: 'Batch-job sim shape: no per-frame render, pure statistics.', icon: 'π' },
 ];
 
@@ -86,7 +86,7 @@ export function Hub({ entries, onRandom }: { entries: SimEntry[]; onRandom: () =
         {/* proof strip */}
         <div className="mx-auto mt-8 grid max-w-3xl grid-cols-2 gap-2 sm:grid-cols-4">
           {[
-            ['1', 'live simulation'], ['60 Hz', 'fixed timestep'], ['100%', 'seeded & deterministic'], ['23', 'unit tests green'],
+            ['4', 'live simulations'], ['60 Hz', 'fixed timestep'], ['2 kinds', 'real-time + batch'], ['76', 'unit tests green'],
           ].map(([v, l]) => (
             <div key={l} className="rounded-2xl border border-slate-200 bg-white px-3 py-3 dark:border-white/10 dark:bg-white/[.04]">
               <div className="text-xl font-black text-slate-900 dark:text-white">{v}</div>
@@ -141,12 +141,12 @@ export function Hub({ entries, onRandom }: { entries: SimEntry[]; onRandom: () =
           </div>
           <ul className="mt-4 space-y-2.5">
             {[
-              'Same seed → identical runs (600-step deep-equal test)',
-              '144 Hz display → still 60 physics steps/s',
-              'URL ↔ state round-trip; garbage params clamped',
-              'Energy conserved at e=1, damped at e<1',
-              'Sim chunk lazy-loaded — hub ships meta only',
-              'Deep links survive hard refresh (#/sim/…)',
+              'Same seed → identical runs; MC identical at any worker count',
+              'Spatial hash property-tested vs brute force (200 seeds)',
+              '144 Hz display → still 60 physics steps/s; HUD proves it (P)',
+              'Tax table reproduces 5 hand-calculated scenarios exactly',
+              'Monte Carlo σ=0 matches the annuity closed form (<1e-5)',
+              'Live params hot-update Boids mid-flight — no flock reset',
             ].map((t) => (
               <li key={t} className="flex gap-2 text-[13px] leading-snug text-slate-600 dark:text-slate-300">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" /> {t}
@@ -211,15 +211,44 @@ function SimCard({ entry }: { entry: SimEntry }) {
   return (
     <a href={`#/sim/${m.id}`}
       className="fade-up group flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-orange-500/10 dark:border-white/10 dark:bg-white/[.04] dark:hover:border-amber-400/40">
-      {/* animated CSS thumbnail — hub imports no sim code */}
+      {/* animated CSS/SVG thumbnail — hub imports no sim code */}
       <div className="relative h-36 overflow-hidden bg-[#0b0f17]">
         <div className="absolute inset-0 opacity-[.55]" style={{ backgroundImage: 'linear-gradient(rgba(148,163,184,.13) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,.13) 1px, transparent 1px)', backgroundSize: '34px 34px' }} />
-        {THUMB_BALLS.map((b, i) => (
+        {m.thumbnail === 'balls' && THUMB_BALLS.map((b, i) => (
           <span key={i} className="thumb-ball absolute top-4 rounded-full"
             style={{ width: b.s, height: b.s, left: b.l, background: b.c, animationDelay: b.d, ['--dur' as any]: b.dur, ['--drop' as any]: b.drop, boxShadow: `0 6px 18px ${b.c}66` }} />
         ))}
+        {m.thumbnail === 'boids' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            {([[30, 40], [60, 30], [90, 48], [120, 34], [150, 52], [180, 38], [210, 55], [70, 80], [110, 92], [160, 84], [205, 98], [245, 78], [130, 66], [45, 105], [235, 40]] as [number, number][]).map(([cx, cy], i) => (
+              <path key={i} d={`M ${cx + 7} ${cy} L ${cx - 5} ${cy - 4} L ${cx - 5} ${cy + 4} Z`} fill={['#38bdf8', '#a78bfa', '#34d399', '#fbbf24', '#fb7185'][i % 5]} opacity="0.9" transform={`rotate(${[12, -8, 20, 4, -14][i % 5]} ${cx} ${cy})`} />
+            ))}
+          </svg>
+        )}
+        {m.thumbnail === 'fan' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            <path d="M10 118 C 90 108, 180 74, 290 26 L 290 96 C 180 122, 90 128, 10 124 Z" fill="rgba(52,211,153,0.20)" />
+            <path d="M10 120 C 100 114, 190 92, 290 56 L 290 78 C 190 108, 100 124, 10 122 Z" fill="rgba(52,211,153,0.35)" />
+            <path d="M10 121 C 100 119, 190 100, 290 66" fill="none" stroke="#34d399" strokeWidth="2.5" />
+            <line x1="170" y1="12" x2="170" y2="130" stroke="rgba(226,232,240,0.4)" strokeDasharray="4 4" />
+          </svg>
+        )}
+        {m.thumbnail === 'bars' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            {[[36, 58, '#94a3b8'], [96, 84, '#38bdf8'], [156, 104, '#a78bfa'], [216, 118, '#34d399']].map(([bx, bh, c], i) => (
+              <g key={i}>
+                <rect x={bx} y={126 - (bh as number)} width="44" height={bh as number} rx="5" fill={c as string} opacity="0.85" />
+                <rect x={bx} y={126 - (bh as number)} width="44" height="6" rx="3" fill="#fff" opacity="0.35" />
+              </g>
+            ))}
+            <line x1="16" y1="126" x2="284" y2="126" stroke="rgba(226,232,240,0.4)" strokeWidth="1.5" />
+          </svg>
+        )}
         <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-black tracking-wider text-white uppercase">
-          <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-white" /> Live · Phase 1
+          <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-white" /> Live
+        </span>
+        <span className={`absolute top-3 right-3 rounded-full px-2.5 py-1 text-[10px] font-black tracking-wider text-white uppercase ${m.kind === 'realtime' ? 'bg-sky-500' : 'bg-violet-500'}`}>
+          {m.kind === 'realtime' ? 'Real-time' : 'Analysis'}
         </span>
         <span className="absolute right-3 bottom-3 rounded-md bg-black/50 px-2 py-1 font-mono text-[10px] text-slate-300">lazy chunk · import()</span>
       </div>

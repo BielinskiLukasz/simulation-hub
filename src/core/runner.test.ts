@@ -4,7 +4,8 @@ import type { RenderContext, Simulation } from './types';
 
 const rc: RenderContext = { ctx: null as never, width: 800, height: 600, theme: 'dark' };
 const counter: Simulation<{ n: number }, { v: number }> = {
-  meta: { id: 'counter', title: 'Counter', category: 'algorithms', description: '', tags: [], difficulty: 'easy', thumbnail: '', accent: '#000' },
+  kind: 'realtime',
+  meta: { id: 'counter', title: 'Counter', kind: 'realtime', category: 'algorithms', description: '', tags: [], difficulty: 'easy', thumbnail: '', accent: '#000' },
   defaultParams: { n: 0 },
   paramSchema: { n: { kind: 'number', label: 'n' } },
   init: () => ({ v: 0 }),
@@ -30,6 +31,46 @@ describe('Runner — fixed timestep', () => {
     const r = make(); r.tick(0); r.tick(5000); expect(r.stepCount).toBeLessThanOrEqual(8);
   });
   it('stepOnce advances exactly one step while paused', () => { const r = make(); r.paused = true; r.stepOnce(); r.stepOnce(); expect(r.stepCount).toBe(2); expect(r.state.v).toBe(2); });
+  it('stats with a fake clock: 16.67 ms deltas → ≈60 fps', () => {
+    let t = 0;
+    const clockSim: Simulation<{ n: number }, { v: number }> = {
+      ...counter,
+      step: (s) => { t += 2; s.v += 1; return s; }, // each step "costs" 2 ms
+      render: () => { t += 1; }, // render "costs" 1 ms
+    };
+    const r = new Runner(clockSim, { n: 0 }, 1, () => rc, { now: () => t });
+    r.tick(0);
+    for (let i = 1; i <= 120; i++) r.tick(i * (1000 / 60));
+    expect(r.stats.fps).toBeGreaterThan(55);
+    expect(r.stats.fps).toBeLessThan(65);
+    expect(r.stats.stepCount).toBe(r.stepCount);
+  });
+
+  it('pointer events are queued and applied before stepping, in order', () => {
+    const appliedAt: number[] = [];
+    const order: string[] = [];
+    const sim: Simulation<{ n: number }, { v: number }> = {
+      ...counter,
+      onPointer: (s, ev) => { appliedAt.push(s.v); order.push(ev.type); return s; },
+    };
+    const r = new Runner(sim, { n: 0 }, 1, () => rc);
+    r.pointer({ type: 'down', x: 1, y: 2, button: 0, shift: false, alt: false, pressed: true });
+    r.pointer({ type: 'click', x: 1, y: 2, button: 0, shift: false, alt: false, pressed: false });
+    expect(order).toEqual([]); // nothing applied until the next tick
+    r.tick(0); r.tick(1000 / 60);
+    expect(order).toEqual(['down', 'click']);
+    expect(appliedAt[0]).toBe(0); // applied BEFORE the first step ran
+  });
+
+  it('pointer events while paused are applied immediately', () => {
+    let applied = 0;
+    const sim: Simulation<{ n: number }, { v: number }> = { ...counter, onPointer: (s) => { applied++; return s; } };
+    const r = new Runner(sim, { n: 0 }, 1, () => rc);
+    r.paused = true;
+    r.pointer({ type: 'down', x: 0, y: 0, button: 0, shift: false, alt: false, pressed: true });
+    expect(applied).toBe(1);
+  });
+
   it('reset with same seed reproduces the initial state', () => {
     const r = make(); const first = r.state.v; drive(r, 0.5, 60); r.reset(); expect(r.state.v).toBe(first); expect(r.stepCount).toBe(0);
     expect(FIXED_DT).toBe(1 / 60);

@@ -1,19 +1,23 @@
 // Assembles the Simulation object. This module is LAZY-LOADED by the shell
 // (see sims/index.ts) — it must never be imported statically by the hub.
 
-import type { Simulation } from '../../core/types';
+import type { RealtimeSimulation } from '../../core/types';
 import { meta } from './meta';
-import { defaultParams, init, step, type Params, type State } from './logic';
+import { applyParams, defaultParams, init, onPointer, step, type Params, type State } from './logic';
 import { paramSchema } from './logic';
 import { render } from './render';
 
-const sim: Simulation<Params, State> = {
+const sim: RealtimeSimulation<Params, State> = {
+  kind: 'realtime',
   meta,
   defaultParams,
   paramSchema,
   init,
   step,
   render,
+  applyParams,
+  onPointer,
+  getStats: (s) => ({ balls: s.balls.length }),
   about: {
     summary:
       'Balls are points with position and velocity in a fixed 800×600 logical world. Each fixed step (1/60 s) applies gravity, integrates position, then clamps at the walls and flips the velocity component scaled by restitution. Nothing here reads the wall clock or Math.random — the seeded RNG stored in state is the only source of chance, and it is only consumed during init.',

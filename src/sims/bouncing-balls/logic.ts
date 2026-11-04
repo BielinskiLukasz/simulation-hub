@@ -30,8 +30,8 @@ export const defaultParams: Params = {
 
 export const paramSchema: ParamSchema<Params> = {
   count: { kind: 'range', label: 'Ball count', min: 1, max: 500, step: 1, hint: 'Re-inits the world' },
-  gravity: { kind: 'range', label: 'Gravity', min: 0, max: 2000, step: 10, unit: 'px/s²' },
-  restitution: { kind: 'range', label: 'Restitution (bounciness)', min: 0, max: 1, step: 0.01, hint: '1 = perfectly elastic' },
+  gravity: { kind: 'range', label: 'Gravity', min: 0, max: 2000, step: 10, unit: 'px/s²', live: true },
+  restitution: { kind: 'range', label: 'Restitution (bounciness)', min: 0, max: 1, step: 0.01, hint: '1 = perfectly elastic', live: true },
   radius: { kind: 'range', label: 'Ball radius', min: 3, max: 30, step: 1, unit: 'px' },
   maxSpeed: { kind: 'number', label: 'Max initial speed', min: 0, max: 1000, step: 10, unit: 'px/s' },
   collisions: { kind: 'boolean', label: 'Ball–ball collisions', hint: 'Naive O(n²) elastic — fine at n ≤ 500' },
@@ -116,6 +116,27 @@ export function step(state: State, dt: number): State {
       }
     }
   }
+  return state;
+}
+
+/** v2 hot update: swap params in place. Positions/velocities are NOT touched. */
+export function applyParams(state: State, params: Params): State {
+  state.params = { ...params };
+  return state;
+}
+
+/** v2 pointer hook: click/drag spawns a ball at the cursor (world coords). */
+export function onPointer(state: State, ev: import('../../core/input').PointerEv): State {
+  if (ev.type !== 'down' && ev.type !== 'click') return state;
+  if (state.balls.length >= 2000) return state;
+  const r = state.params.radius;
+  state.balls.push({
+    x: Math.min(Math.max(ev.x, r), state.w - r),
+    y: Math.min(Math.max(ev.y, r), state.h - r),
+    vx: state.rng.range(-state.params.maxSpeed, state.params.maxSpeed),
+    vy: state.rng.range(-state.params.maxSpeed, 0),
+    hue: state.rng.range(0, 360),
+  });
   return state;
 }
 

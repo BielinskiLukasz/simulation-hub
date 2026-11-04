@@ -94,8 +94,8 @@ export default function App() {
 
       <footer className="border-t border-slate-900/[.07] dark:border-white/[.08]">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-3 px-4 py-5 text-[12px] text-slate-400 sm:px-6 dark:text-slate-500">
-          <span className="inline-flex items-center gap-1.5 font-semibold"><Compass className="h-3.5 w-3.5" /> Simulation Hub — Phase 1 foundation</span>
-          <span className="font-mono text-[11px]">core/ pure TS · sims lazy-loaded · fixed dt 1/60 · mulberry32 seeded RNG</span>
+          <span className="inline-flex items-center gap-1.5 font-semibold"><Compass className="h-3.5 w-3.5" /> Simulation Hub — Phase 2 proof sims</span>
+          <span className="font-mono text-[11px]">core/ pure TS · realtime + batch kinds · deterministic chunked jobs · seeded RNG</span>
           <span className="ml-auto inline-flex items-center gap-3">
             <span className="font-mono text-[11px]">npm test · lint · typecheck · build → GitHub Pages</span>
             <GitBranch className="h-4 w-4" />

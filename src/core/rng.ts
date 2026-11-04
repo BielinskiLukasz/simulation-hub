@@ -23,6 +23,28 @@ export function createRng(seed: number): Rng {
   };
 }
 
+/** Derive an independent, well-mixed 32-bit seed for chunk `index` from a base seed. */
+export function deriveSeed(seed: number, index: number): number {
+  let z = (seed ^ Math.imul(index + 1, 0x9e3779b9)) >>> 0;
+  z = Math.imul(z ^ (z >>> 16), 0x85ebca6b);
+  z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35);
+  return (z ^ (z >>> 16)) >>> 0;
+}
+
+/** Standard normal sampler (Box–Muller with a cached spare). Create one per chunk/stream. */
+export function createNormal(rng: Rng): () => number {
+  let spare: number | null = null;
+  return () => {
+    if (spare !== null) { const s = spare; spare = null; return s; }
+    let u = 0;
+    while (u === 0) u = rng.next();
+    const v = rng.next();
+    const m = Math.sqrt(-2 * Math.log(u));
+    spare = m * Math.sin(2 * Math.PI * v);
+    return m * Math.cos(2 * Math.PI * v);
+  };
+}
+
 /** Normalise any user-supplied seed (URL, text input) into a uint32. */
 export function normaliseSeed(raw: unknown, fallback = 42): number {
   if (typeof raw === 'number' && Number.isFinite(raw)) return Math.floor(Math.abs(raw)) >>> 0;

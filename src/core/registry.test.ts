@@ -3,7 +3,7 @@ import { filterEntries, findEntry } from './registry';
 import type { SimEntry } from './types';
 
 const mk = (id: string, tags: string[]): SimEntry => ({
-  meta: { id, title: id, category: 'physics', description: `about ${id}`, tags, difficulty: 'easy', thumbnail: '', accent: '#000' },
+  meta: { id, title: id, kind: 'realtime', category: 'physics', description: `about ${id}`, tags, difficulty: 'easy', thumbnail: '', accent: '#000' },
   load: async () => { throw new Error('not loaded in registry tests'); },
 });
 const list = [mk('bouncing-balls', ['gravity']), mk('boids', ['flocking'])];

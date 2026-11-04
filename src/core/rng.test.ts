@@ -1,5 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { createRng } from './rng';
+import { createNormal, createRng, deriveSeed } from './rng';
+
+describe('deriveSeed', () => {
+  it('no collisions over indices 0..9999 for a fixed seed', () => {
+    const seen = new Set<number>();
+    for (let i = 0; i < 10000; i++) seen.add(deriveSeed(42, i));
+    expect(seen.size).toBe(10000);
+  });
+  it('different base seeds give different streams', () => {
+    expect(deriveSeed(1, 0)).not.toBe(deriveSeed(2, 0));
+    expect(deriveSeed(1, 5)).not.toBe(deriveSeed(2, 5));
+  });
+});
+
+describe('createNormal (Box–Muller)', () => {
+  it('mean ≈ 0 and variance ≈ 1 over 100k samples; same seed → same sequence', () => {
+    const n = 100000;
+    const a = createNormal(createRng(99));
+    const b = createNormal(createRng(99));
+    let sum = 0; let sum2 = 0;
+    for (let i = 0; i < n; i++) {
+      const v = a();
+      if (i < 100) expect(v).toBe(b());
+      sum += v; sum2 += v * v;
+    }
+    const mean = sum / n;
+    const variance = sum2 / n - mean * mean;
+    expect(Math.abs(mean)).toBeLessThan(0.02);
+    expect(Math.abs(variance - 1)).toBeLessThan(0.03);
+  });
+});
 
 describe('createRng (mulberry32)', () => {
   it('same seed → identical sequence of 1000 values', () => {

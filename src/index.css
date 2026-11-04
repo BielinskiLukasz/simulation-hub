@@ -10,6 +10,22 @@
 html { scroll-behavior: smooth; }
 body { font-family: var(--font-sans); }
 
+/* chart theme tokens (read by ui/chart-theme.ts, re-read on theme change) */
+:root {
+  --chart-axis: #64748b;
+  --chart-grid: rgba(15, 23, 42, 0.09);
+  --chart-text: #334155;
+  --chart-bg: rgba(255, 255, 255, 0.92);
+  --chart-border: rgba(15, 23, 42, 0.14);
+}
+[data-theme="dark"] {
+  --chart-axis: #94a3b8;
+  --chart-grid: rgba(148, 163, 184, 0.14);
+  --chart-text: #cbd5e1;
+  --chart-bg: rgba(2, 6, 23, 0.82);
+  --chart-border: rgba(148, 163, 184, 0.3);
+}
+
 ::selection { background: #f59e0b; color: #111827; }
 
 /* visible focus everywhere (a11y baseline from the spec) */

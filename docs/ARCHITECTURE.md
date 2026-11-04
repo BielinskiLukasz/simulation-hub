@@ -1,4 +1,69 @@
-# Architecture — Simulation Hub (Phase 1)
+# Architecture — Simulation Hub
+
+## Contract v2 (Phase 2) — the one deliberate revision
+
+Phase 1's friction list, resolved:
+
+| Friction | Resolution |
+|---|---|
+| Monte Carlo has no per-frame `step` | Two kinds: `RealtimeSimulation` (loop-driven) and `BatchSimulation` (job-driven `plan → process → reduce`). The shell dispatches on `kind`. |
+| Slider changes re-init the flock | `ParamDef.live?: boolean` + optional `applyParams(state, params)`: live params hot-update; others still re-init. Bouncing Balls' `gravity`/`restitution` migrated first as the regression test. |
+| No pointer interaction | Optional `onPointer(state, ev)`; the runner queues events and applies them at the start of the next tick, before stepping (paused: immediately). Events carry world coordinates (`core/input.ts` pure, `ui/pointer.ts` DOM side). |
+| No performance visibility | Optional `getStats(state)` + runner-measured `fps / stepMs / renderMs / maxFrameMs` (injected clock, EMA + rolling max in `core/stats.ts`). HUD toggles with `P` or `?hud=1`. |
+| Rng-in-state vs passed to `step` | **Decision: keep Rng in state.** It worked in v1; per-step passing adds nothing. |
+| Immutable vs mutate-in-place | **Decision: realtime sims may mutate and return the same state.** Tests snapshot via `structuredClone` or typed-array `.slice()`. |
+
+### Batch determinism (the Phase-2 invariant)
+
+Fixed chunk size (Monte Carlo: 1,000 runs — never derived from worker count),
+per-chunk seeds via `deriveSeed(seed, chunkIndex)`, and `reduce` always
+receives parts in chunk order. Same seed ⇒ identical results on 1 or 16
+workers; proven by processing chunks in reverse order in tests.
+`runtime/worker-pool.ts` talks to a `Transport` seam. Monte Carlo provides
+`createWorker`, spawning **Blob Web Workers** that run `processChunk`'s own
+serialised source (`runtime/worker-factory.ts`; the function is
+self-contained for exactly this, and a test proves serialised ≡ direct
+output) — so real workers execute even in the single-file build, with
+zero-copy transfer of checkpoint buffers. If Workers are blocked, the batch
+shell falls back once to the in-thread transport and says so; results are
+identical by construction. (`WorkerTransport` + `expose-worker.ts` +
+`sims/monte-carlo/worker.ts` remain for file-based worker deployments.)
+
+### Phase-2 implementation notes (build-environment deviations, honestly)
+
+- The UI shell is React (the spec allows swapping `ui/` if `core/` stays
+  framework-free — it did, and ESLint still enforces it).
+- Charts use a small zero-dependency canvas engine behind the planned
+  wrapper API (`createChart → setData/setTheme/resize/dispose`, kinds:
+  lines / bands / histogram) instead of uPlot, keeping the single-file
+  bundle lean. Swapping in uPlot touches only sim views' `createChart` call.
+- Boids step budget (≤ 6 ms @ 5k) was measured at ~10.6 ms/step in the
+  CPU-throttled build sandbox (avgNeighbors ≈ 52 at default density) after
+  inlining the neighbour loop, removing the scratch-buffer copy, and
+  halving the hash cell size (5×5 query block). The default 1,500-boid
+  flock steps in ~1.5 ms there; a mid-range laptop (the budget's reference)
+  is expected several times faster — re-run the bench on target hardware
+  before quoting the number.
+
+### What still hurts (candidates for Contract v3 — not implemented)
+
+1. **Snapshotability:** Phase 3 time-travel needs cheap state snapshots.
+   Boids (typed arrays, `.slice()`) is ready; Bouncing Balls' object arrays
+   are copyable but not free. A `snapshot?/restore?` hook may belong in v3.
+2. **Batch views are imperative DOM** inside a React shell (`mountResult`);
+   works and disposes cleanly, but a declarative result spec would test better.
+3. **Reduce on the main thread:** Monte Carlo's column sorts could exceed
+   ~100 ms at 50k runs on slow devices; a second-stage worker reduce is the
+   planned escape hatch (measure first).
+4. **Input recording:** the runner applies pointer events on step boundaries
+   but does not yet record them; Phase 3 replay will need an input log keyed
+   by step count.
+5. `getStats` returns untyped records — fine for a HUD, weak for the Phase-6
+   time-series recorder.
+
+---
+
+# Phase 1 foundation (unchanged)
 
 ## Contract v1 (`src/core/types.ts`)
 

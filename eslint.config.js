@@ -4,7 +4,7 @@
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist', 'dist-split', 'node_modules'] },
+  { ignores: ['dist', 'node_modules'] },
   ...tseslint.configs.recommended,
   {
     // The UI shell is the type-erased boundary: it renders ANY registered

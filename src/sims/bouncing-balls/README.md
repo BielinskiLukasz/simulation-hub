@@ -18,3 +18,11 @@ works, every future sim is just a folder plus one manifest line.
 
 Param changes re-init the sim with the same seed (Contract v1 behaviour) and
 rewrite the URL via `history.replaceState`, so any state is shareable as a link.
+
+## Contract v2 migration (Phase 2)
+
+- `kind: 'realtime'`; `gravity` and `restitution` are **`live`** — they
+  hot-update via `applyParams` without moving a single ball (tested).
+- `onPointer`: clicking the canvas spawns a ball at the cursor (world
+  coordinates, queued by the runner onto step boundaries).
+- `getStats` reports the ball count to the perf HUD (key `P`).

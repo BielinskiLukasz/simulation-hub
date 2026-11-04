@@ -6,7 +6,7 @@
 | 2 | Proof sims: Boids, Monte Carlo (workers), Tax wrappers, charts, perf HUD, pointer input | 40–55 h (3–4 weekends) | 40–55 h | implemented |
 | 3 | Signature sims: DES engine, time-travel, event log, timeline, scheduler, Raft, JVM GC | 4–5 weekends | **70–80 h core / 90–100 h full (6–9 weekends)** | implemented (core tier) |
 | 4 | Grids & algorithms: grid core/editor, trace player, compare mode, Pathfinding, Falling Sand, Cache | says 3–4 weekends | **70–80 h core / 90–100 h full (6–8 weekends)** | implemented (core tier) |
-| 5 | Scale & worlds: camera, N-body, cloth, reactions, circuit editor | — | — | planned |
+| 5 | Physics: camera, integrators, diagnostics, Barnes–Hut, N-body, cloth, circuit | 4 weekends | **80–90 h core / 100–115 h full (7–9 weekends)** | implemented (core tier) |
 | 6 | Telemetry: time-series recorder, dashboards, batch seed runner | — | — | planned |
 | 7 | Bonus: WebGL sand, city overlays, scenario presets | — | — | planned |
 

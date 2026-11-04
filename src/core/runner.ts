@@ -26,6 +26,7 @@ export class Runner<P, S> {
   speed = 1;
   stepCount = 0;
   onFrame: (() => void) | null = null;
+  onStep: (() => void) | null = null;
 
   private acc = 0;
   private lastTs: number | null = null;
@@ -127,13 +128,29 @@ export class Runner<P, S> {
   }
 
   stepOnce(): void {
+    this.flushInputs();
+    this.advance();
+    this.renderNow();
+    this.onFrame?.();
+  }
+
+  /** Contract v5 compare: advance exactly k fixed steps (lockstep). */
+  advanceSteps(k: number): void {
+    this.flushInputs();
+    for (let i = 0; i < Math.max(0, Math.floor(k)); i++) this.advance();
+    this.renderNow();
+    this.onFrame?.();
+  }
+
+  private flushInputs(): void {
+    if (this.editQueue.length > 0 && this.sim.onEdit) {
+      for (const e of this.editQueue) this.state = this.sim.onEdit(this.state, e);
+      this.editQueue.length = 0;
+    }
     if (this.queue.length > 0 && this.sim.onPointer) {
       for (const ev of this.queue) this.state = this.sim.onPointer(this.state, ev);
       this.queue.length = 0;
     }
-    this.advance();
-    this.renderNow();
-    this.onFrame?.();
   }
 
   renderOnce(): void { this.renderNow(); }
@@ -156,6 +173,7 @@ export class Runner<P, S> {
     this.acc = 0;
     this.lastTs = null;
     this.queue.length = 0;
+    this.editQueue.length = 0;
     this.renderNow();
     this.onFrame?.();
   }
@@ -188,5 +206,6 @@ export class Runner<P, S> {
   private advance(): void {
     this.state = this.sim.step(this.state, FIXED_DT);
     this.stepCount++;
+    this.onStep?.();
   }
 }

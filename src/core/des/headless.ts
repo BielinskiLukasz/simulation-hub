@@ -7,6 +7,7 @@ import { Engine } from './engine';
 export interface HeadlessOptions {
   untilTime?: number;
   maxEvents?: number;
+  input?: unknown;
 }
 
 export interface HeadlessResult<S> {
@@ -16,13 +17,13 @@ export interface HeadlessResult<S> {
   now: number;
 }
 
-export function runHeadless<P, S, E, A>(
-  sim: EventSimulation<P, S, E, A>,
+export function runHeadless<P, S, E, A, I = unknown, Sh = unknown>(
+  sim: EventSimulation<P, S, E, A, I, Sh>,
   params: P,
   seed: number,
   opts: HeadlessOptions = {},
 ): HeadlessResult<S> {
-  const engine = new Engine(sim, params, seed);
+  const engine = new Engine(sim, params, seed, opts.input as I | undefined);
   if (opts.untilTime !== undefined) engine.runUntil(opts.untilTime, opts.maxEvents);
   else if (opts.maxEvents !== undefined) {
     // step-capped mode: stop quietly at the cap (tests, compare previews)

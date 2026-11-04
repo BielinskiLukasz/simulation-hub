@@ -1,5 +1,26 @@
 # Architecture — Simulation Hub
 
+## Contract v5 (Phase 5) — physics, camera, diagnostics, circuits
+
+- Realtime sims may declare `camera` (pure math in `core/camera.ts`; gestures in
+  `ui/camera-controls.ts`), `diagnostics` (sampled by step count, decimating
+  recorder, log-drift chart), and `compare` (Phase-4 `CompareSpec` reused).
+- Physics state is `Float64Array`; step functions use only IEEE-exact ops
+  (+ - * / and sqrt) — no hypot/pow/sin/cos/exp — so trajectories are
+  cross-engine reproducible. The fixed-step Runner is unchanged; physics dt
+  and substeps are sim params.
+- `RunnerGroup` owns one accumulator and advances every pane the same number
+  of fixed steps (exact lockstep); pointer input is mirrored in world
+  coordinates and cameras link by default.
+- Event sims gain `input` + `compile(params, input) -> shared`: compiled,
+  immutable structures (circuit netlists) live outside snapshots.
+- Barnes–Hut is a flat typed-array quadtree with depth-capped aggregation.
+  It intentionally breaks pairwise symmetry, so momentum drift at θ>0 is
+  documented behaviour. Softened forces always pair with the softened potential.
+- v6 candidates: compare for event sims (two Players, shared time axis),
+  metrics recorder generalization, graph generators/layout, camera reuse for
+  large agent worlds.
+
 ## Contract v4 (Phase 4) — editable grids, traces, compare
 
 - New kind `trace`: pure `run(input, params) → TraceResult` (struct-of-arrays),

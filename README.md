@@ -1,9 +1,12 @@
 # Simulation Hub
 
-**Phase 4 — Grids & Algorithms.** A deterministic simulation platform with **14 simulations across four execution paradigms** (real-time, batch, event, trace) under **Contract v4**:
+**Phase 5 — Physics & Circuits.** A deterministic simulation platform with **17 simulations across four execution paradigms** (real-time, batch, event, trace) under **Contract v5**:
 
 | Sim | Kind | Showcases |
 |---|---|---|
+| **N-Body Gravity** | realtime | Integrators, Barnes–Hut, energy diagnostics, camera, realtime compare |
+| **Soft Body & Cloth** | realtime | Verlet constraints, grab/cut/tear, wind, iterations compare |
+| **Circuit / Logic Gates** | event | 3-valued event logic, editor, waveforms, verified 4-bit adder |
 | **Pathfinding Arena** | trace | A*, Dijkstra, BFS, greedy, JPS on an editable weighted grid; admissibility badge; work-synced race |
 | **Falling Sand** | realtime | 400×300 materials CA, data-driven reactions, shared grid editor painting at step boundaries |
 | **Cache Hierarchy** | trace | Set-associative L1/L2/L3, LRU/FIFO/random, AMAT, row- vs column-major matrix race |
@@ -32,7 +35,7 @@ Every simulation run is bit-identical and shareable via its URL hash (e.g. `#/si
 ```bash
 npm install
 npm run dev        # dev server
-npm test           # Vitest — 210 tests, node environment (core needs no DOM)
+npm test           # Vitest — 247 tests, node environment (core needs no DOM)
 npm run lint       # ESLint, incl. the architecture rules below
 npm run typecheck  # tsc --noEmit (strict + noUncheckedIndexedAccess)
 npm run build      # production build

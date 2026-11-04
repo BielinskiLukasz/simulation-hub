@@ -71,7 +71,7 @@ export function mountView(host: HTMLElement, ctx: TraceViewContext): TraceView<I
 
   function installEditor() {
     editor?.dispose();
-    const spec = inputSpec.editor!;
+    const spec = inputSpec.editor as Extract<NonNullable<typeof inputSpec.editor>, { palette: unknown }>;
     editor = mountGridEditor(toolbarHost, spec, {
       canvas: canvas.canvas,
       cellAt: (x, y) => canvas.cellAt(x, y),

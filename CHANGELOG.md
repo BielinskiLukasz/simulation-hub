@@ -1,5 +1,13 @@
 # Changelog
 
+## Contract v5 — Phase 5 (Physics & Circuits)
+
+- **Platform:** pure camera math + gesture controls (pan/zoom/pinch, F fit, follow), selectable integrators (Euler, semi-implicit, Verlet, RK4) with a zero-allocation `Stepper`, conserved-quantity diagnostics with a decimating recorder and log-drift chart, flat-array Barnes–Hut quadtree, Tarjan SCC, shared varint/base64 codec helpers, non-wrapping spatial hash, and `RunnerGroup` lockstep realtime compare with mirrored input and linked cameras.
+- **N-Body Gravity:** Float64 presets (solar system, figure-8, chaos, galaxy, cluster), direct/tree forces with matching softened potential, trails, drag-launch/delete, diagnostics and integrator/method/dt compare modes.
+- **Soft Body & Cloth:** Verlet particles, alternating Gauss–Seidel constraints, cloth/rope/blob builders, deterministic hash-noise wind, grab/cut/tear/pins, strain colouring and iterations compare.
+- **Circuit / Logic Gates:** 3-valued event-driven logic with transport delays, compiled netlists excluded from snapshots (`compile` → `shared`), binary/JSON codecs, patch-based editor with undo, examples, waveform timeline, truth table and a 512-combination verified 4-bit adder.
+- **Verification:** frame-rate independence asserted bitwise for N-body, cloth and the runner patterns; integrator order/Euler closed-form tests; Barnes–Hut vs direct accuracy; circuit differential and adder tests.
+
 ## Contract v4 — Phase 4 (Grids & Algorithms)
 
 - **Grid core (`core/grid/`):** typed-array grid + corner-rule neighbours, pure edits (stamp/line/rect/flood-fill/replace) with exact undo patches, RLE+base64url and JSON codecs with strict validation, four perfect-maze generators, seeded value-noise terrain, ASCII fixtures. `UndoStack`, indexed min-heap.

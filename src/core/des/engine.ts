@@ -20,7 +20,7 @@ export interface EngineSnapshot<S, E> {
   eventTimes: number[];
 }
 
-export class Engine<P, S, E, A> {
+export class Engine<P, S, E, A, I = unknown, Sh = unknown> {
   state: S;
   now = 0;
   head = 0;
@@ -34,14 +34,20 @@ export class Engine<P, S, E, A> {
   private sameTimeCount = 0;
   private lastEventTime = -1;
 
+  readonly shared: Sh;
+
   constructor(
-    private sim: EventSimulation<P, S, E, A>,
+    private sim: EventSimulation<P, S, E, A, I, Sh>,
     readonly params: P,
     seed: number,
+    input?: I,
   ) {
     this.rng = createRng(seed);
+    const effectiveInput = (input ?? (sim.input ? sim.input.initial(seed) : undefined)) as I;
+    this.shared = (sim.compile ? sim.compile(params, effectiveInput) : undefined) as Sh;
     const initCtx = {
       rng: this.rng,
+      shared: this.shared,
       schedule: (delay: number, payload: E) => this.scheduleAt(delay, payload),
     };
     this.state = sim.init(params, initCtx);
@@ -60,11 +66,12 @@ export class Engine<P, S, E, A> {
     return this.queue.push(t, payload);
   }
 
-  private makeCtx(): EventCtx<S, E> {
+  private makeCtx(): EventCtx<S, E, Sh> {
     return {
       state: this.state,
       now: this.now,
       rng: this.rng,
+      shared: this.shared,
       schedule: (delay, payload) => this.scheduleAt(delay, payload),
       cancel: (id) => this.queue.cancel(id),
       log: (entry) => { this.pendingLog.push(entry); },

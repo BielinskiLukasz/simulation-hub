@@ -62,7 +62,7 @@ export default function App() {
             </span>
             <span className="leading-none">
               <span className="block text-[15px] font-black tracking-tight">Simulation Hub</span>
-              <span className="mt-0.5 block font-mono text-[9px] font-bold tracking-[.18em] text-slate-400 uppercase dark:text-slate-500">Contract v4 · Phase 4</span>
+              <span className="mt-0.5 block font-mono text-[9px] font-bold tracking-[.18em] text-slate-400 uppercase dark:text-slate-500">Contract v5 · Phase 5</span>
             </span>
           </a>
           <nav className="ml-4 hidden items-center gap-1 text-[13px] font-semibold md:flex" aria-label="Primary">
@@ -71,7 +71,9 @@ export default function App() {
             <a href="#/sim/time-travel-debugger" className={`rounded-lg px-2.5 py-1.5 transition ${route.name === 'sim' && route.id === 'time-travel-debugger' ? 'bg-slate-900/[.06] text-slate-900 dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}>Time-Travel</a>
             <a href="#/sim/raft" className={`rounded-lg px-2.5 py-1.5 transition ${route.name === 'sim' && route.id === 'raft' ? 'bg-slate-900/[.06] text-slate-900 dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}>Raft</a>
             <a href="#/sim/jvm-gc" className={`rounded-lg px-2.5 py-1.5 transition ${route.name === 'sim' && route.id === 'jvm-gc' ? 'bg-slate-900/[.06] text-slate-900 dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}>JVM GC</a>
-            <a href="#/sim/cache-hierarchy" className={`rounded-lg px-2.5 py-1.5 transition ${route.name === 'sim' && route.id === 'cache-hierarchy' ? 'bg-slate-900/[.06] text-slate-900 dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}>Cache</a>
+            <a href="#/sim/n-body" className={`rounded-lg px-2.5 py-1.5 transition ${route.name === 'sim' && route.id === 'n-body' ? 'bg-slate-900/[.06] text-slate-900 dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}>N-Body</a>
+            <a href="#/sim/cloth" className={`rounded-lg px-2.5 py-1.5 transition ${route.name === 'sim' && route.id === 'cloth' ? 'bg-slate-900/[.06] text-slate-900 dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}>Cloth</a>
+            <a href="#/sim/circuit" className={`rounded-lg px-2.5 py-1.5 transition ${route.name === 'sim' && route.id === 'circuit' ? 'bg-slate-900/[.06] text-slate-900 dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}>Circuit</a>
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <button onClick={goRandom} className="hidden h-9 items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-[13px] font-semibold text-slate-600 transition hover:bg-slate-50 md:inline-flex dark:border-white/15 dark:text-slate-300 dark:hover:bg-white/5">
@@ -98,8 +100,8 @@ export default function App() {
 
       <footer className="border-t border-slate-900/[.07] dark:border-white/[.08]">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-3 px-4 py-5 text-[12px] text-slate-400 sm:px-6 dark:text-slate-500">
-          <span className="inline-flex items-center gap-1.5 font-semibold"><Compass className="h-3.5 w-3.5" /> Simulation Hub — Phase 4 grids & algorithms</span>
-          <span className="font-mono text-[11px]">core/ pure TS · realtime, batch, event & trace engines · grids, time-travel, compare</span>
+          <span className="inline-flex items-center gap-1.5 font-semibold"><Compass className="h-3.5 w-3.5" /> Simulation Hub — Phase 5 physics & circuits</span>
+          <span className="font-mono text-[11px]">core/ pure TS · realtime, batch, event & trace engines · physics, circuits, compare</span>
           <span className="ml-auto inline-flex items-center gap-3">
             <span className="font-mono text-[11px]">npm test · lint · typecheck · build → GitHub Pages</span>
             <GitBranch className="h-4 w-4" />

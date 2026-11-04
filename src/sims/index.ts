@@ -18,6 +18,9 @@ import { meta as timeTravelDebugger } from './time-travel-debugger/meta';
 import { meta as pathfinding } from './pathfinding/meta';
 import { meta as fallingSand } from './falling-sand/meta';
 import { meta as cacheHierarchy } from './cache-hierarchy/meta';
+import { meta as nBody } from './n-body/meta';
+import { meta as cloth } from './cloth/meta';
+import { meta as circuit } from './circuit/meta';
 
 // Order is STABLE and append-only: Phase 1 → Phase 4, in the order each sim
 // was added. New simulations go at the END, so adding one never reshuffles
@@ -39,4 +42,7 @@ export const entries: SimEntry[] = [
   { meta: pathfinding, load: () => import('./pathfinding/index') },
   { meta: fallingSand, load: () => import('./falling-sand/index') },
   { meta: cacheHierarchy, load: () => import('./cache-hierarchy/index') },
+  { meta: nBody, load: () => import('./n-body/index') },
+  { meta: cloth, load: () => import('./cloth/index') },
+  { meta: circuit, load: () => import('./circuit/index') },
 ];

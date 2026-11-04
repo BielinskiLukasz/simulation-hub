@@ -13,6 +13,12 @@ const sim: RealtimeSimulation<Params, State> = {
   render,
   applyParams,
   onPointer,
+  camera: {
+    initial: () => ({ cx: 400, cy: 300, zoom: 1 }),
+    fit: () => ({ x: 0, y: 0, w: 800, h: 600 }),
+    minZoom: 0.35,
+    maxZoom: 6,
+  },
   getStats: (s) => ({
     boids: s.n,
     predators: s.predators.length,

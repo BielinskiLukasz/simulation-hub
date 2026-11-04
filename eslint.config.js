@@ -14,7 +14,7 @@ export default tseslint.config(
     rules: { '@typescript-eslint/no-explicit-any': 'off' },
   },
   {
-    files: ['src/core/**/*.ts', 'src/sims/**/logic.ts'],
+    files: ['src/core/**/*.ts', 'src/sims/**/logic.ts', 'src/sims/circuit/model.ts', 'src/sims/circuit/sim.ts', 'src/sims/n-body/logic.ts', 'src/sims/cloth/logic.ts'],
     rules: {
       'no-restricted-globals': ['error',
         { name: 'document', message: 'core/logic must not touch the DOM.' },

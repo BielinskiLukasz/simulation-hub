@@ -22,6 +22,12 @@ import { EventPage } from './event-page';
 import { mountGridEditor, type EditorHandle } from './grid-editor';
 import { exportJson, importJson } from '../core/grid/codec';
 import { TracePage } from './trace-page';
+import { RealtimeComparePage } from './realtime-compare';
+import { DiagnosticsPanel } from './diagnostics-panel';
+import { DiagnosticsRecorder } from '../core/diagnostics';
+import { attachCameraControls, type CameraControls } from './camera-controls';
+import { fitRect, followStep, toViewport, visibleWorldRect } from '../core/camera';
+import type { Camera as CameraState } from '../core/types';
 
 const SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
 const WORLD = { w: 800, h: 600 };
@@ -75,6 +81,14 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
   const [simStats, setSimStats] = useState<Record<string, number | string>>({});
   const editorHostRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorHandle | null>(null);
+  const [compareOn, setCompareOn] = useState(() => query.get('cmp') !== null);
+  const cameraRef = useRef<CameraState>({ cx: 400, cy: 300, zoom: 1 });
+  const cameraControlsRef = useRef<CameraControls | null>(null);
+  const [followCam, setFollowCam] = useState(false);
+  const followRef = useRef(false);
+  followRef.current = followCam;
+  const diagRecorderRef = useRef(new DiagnosticsRecorder());
+  const [diagSamples, setDiagSamples] = useState<unknown[]>([]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -90,7 +104,7 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
   }, [entry.meta.id, sim]);
 
   useEffect(() => {
-    if (!sim.editor || !sim.onEdit) return;
+    if (compareOn || !sim.editor || !sim.onEdit) return;
     const host = editorHostRef.current;
     const canvas = canvasRef.current;
     if (!host || !canvas) return;
@@ -131,7 +145,7 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
     });
     editorRef.current = ed;
     return () => { ed.dispose(); editorRef.current = null; };
-  }, [sim]);
+  }, [sim, compareOn]);
 
   useEffect(() => {
     let alive = true;
@@ -149,7 +163,17 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
     if (canvas && wrap) {
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        const getContext = (): RenderContext => ({ ctx, width: WORLD.w, height: WORLD.h, theme: themeRef.current });
+        const getContext = (): RenderContext => {
+          const camera = cameraRef.current;
+          const view = sim.camera ? {
+            camera,
+            viewport: toViewport(camera, WORLD),
+            worldRect: visibleWorldRect(camera, WORLD),
+            dpr: Math.min(window.devicePixelRatio || 1, 2),
+            px: (n: number) => n / camera.zoom,
+          } : undefined;
+          return { ctx, width: WORLD.w, height: WORLD.h, theme: themeRef.current, view };
+        };
         const fit = () => {
           const dpr = Math.min(window.devicePixelRatio || 1, 2);
           const w = Math.max(wrap.clientWidth, 280);
@@ -163,9 +187,29 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
         runner = new Runner(sim, decoded.params, decoded.seed, getContext);
         runner.onFrame = () => { framesRef.current++; };
         runnerRef.current = runner;
+        if (sim.camera) {
+          cameraRef.current = sim.camera.initial(runner.state);
+          cameraControlsRef.current = attachCameraControls(canvas, {
+            getCamera: () => cameraRef.current,
+            setCamera: (c) => { cameraRef.current = c; },
+            size: () => WORLD,
+            minZoom: sim.camera.minZoom,
+            maxZoom: sim.camera.maxZoom,
+            usesRightClick: sim.camera.usesRightClick,
+            onChange: () => runner?.renderOnce(),
+          });
+        }
+        if (sim.diagnostics) {
+          diagRecorderRef.current = new DiagnosticsRecorder();
+          const specDiag = sim.diagnostics;
+          runner.onStep = () => {
+            const every = Math.max(1, specDiag.everySteps(runner!.state));
+            if (runner!.stepCount % every === 0) diagRecorderRef.current.push(specDiag.sample(runner!.state));
+          };
+        }
         runner.start();
         if (sim.onPointer) {
-          unbindPointer = bindPointer(canvas, WORLD, (ev) => runnerRef.current?.pointer(ev));
+          unbindPointer = bindPointer(canvas, WORLD, (ev) => runnerRef.current?.pointer(ev), sim.camera ? () => toViewport(cameraRef.current, WORLD) : undefined);
         }
         ro = new ResizeObserver(() => { fit(); runner?.renderOnce(); });
         ro.observe(wrap);
@@ -175,6 +219,11 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
           const fps = (framesRef.current - lastFrames) * 4;
           lastFrames = framesRef.current;
           setStats({ steps: runner.stepCount, time: runner.simTime, fps });
+          if (sim.diagnostics) setDiagSamples([...diagRecorderRef.current.samples]);
+          if (followRef.current && sim.camera?.follow) {
+            const target = sim.camera.follow(runner.state);
+            if (target) { cameraRef.current = followStep(cameraRef.current, target, 0.25, 0.35); runner.renderOnce(); }
+          }
           if (hudRef.current) {
             setRunnerStats(runner.stats);
             if (sim.getStats) setSimStats(sim.getStats(runner.state));
@@ -187,11 +236,13 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
       runner?.stop();
       ro?.disconnect();
       unbindPointer?.();
+      cameraControlsRef.current?.dispose();
+      cameraControlsRef.current = null;
       window.clearInterval(statsTimer);
       runnerRef.current = null;
     };
     // deps: sim identity — query decoded once per navigation (by design)
-  }, [sim, entry, query]);
+  }, [sim, entry, query, compareOn]);
 
   useEffect(() => { runnerRef.current?.renderOnce(); }, [theme]);
 
@@ -241,10 +292,16 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
       else if (e.key === '.') stepOnce();
       else if (e.key === 'r' || e.key === 'R') reset();
       else if (e.key === 'p' || e.key === 'P') setHud((h) => !h);
+      else if ((e.key === 'f' || e.key === 'F') && sim.camera) { const r = sim.camera.fit?.(runnerRef.current!.state); if (r) { cameraRef.current = fitRect(r, WORLD, 30, sim.camera!); runnerRef.current?.renderOnce(); } }
+      else if (e.key === '0' && sim.camera) { cameraRef.current = sim.camera.initial(runnerRef.current!.state); runnerRef.current?.renderOnce(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [togglePause, stepOnce, reset]);
+
+  if (compareOn && sim.compare && params) {
+    return <RealtimeComparePage entry={entry} sim={sim} query={query} theme={theme} params={params} seed={seed} onClose={() => setCompareOn(false)} />;
+  }
 
   const meta = entry.meta;
 
@@ -280,6 +337,18 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
               <button onClick={() => setHud((h) => !h)} aria-pressed={hud} className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-[13px] font-semibold transition ${hud ? 'border-amber-400 bg-amber-500/10 text-amber-700 dark:text-amber-300' : 'border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-white/15 dark:text-slate-300 dark:hover:bg-white/5'}`} title="Perf HUD (P)">
                 <Activity className="h-4 w-4" /> HUD
               </button>
+              {sim.compare && (
+                <button onClick={() => setCompareOn(true)} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-sky-400 bg-sky-500/10 px-3 text-[13px] font-bold text-sky-700 dark:text-sky-300" title="Side-by-side compare (lockstep)">
+                  Compare
+                </button>
+              )}
+              {sim.camera && (
+                <>
+                  <button onClick={() => { const r = sim.camera?.fit?.(runnerRef.current!.state); if (r) { cameraRef.current = fitRect(r, WORLD, 30, sim.camera!); runnerRef.current?.renderOnce(); } }} className="h-9 rounded-lg border border-slate-300 px-2.5 text-[12px] font-bold text-slate-500 dark:border-white/15 dark:text-slate-300" title="Fit view (F)">Fit</button>
+                  <button onClick={() => { cameraRef.current = sim.camera!.initial(runnerRef.current!.state); runnerRef.current?.renderOnce(); }} className="h-9 rounded-lg border border-slate-300 px-2.5 text-[12px] font-bold text-slate-500 dark:border-white/15 dark:text-slate-300" title="Reset view (0)">View</button>
+                  {sim.camera.follow && <button aria-pressed={followCam} onClick={() => setFollowCam((v) => !v)} className={`h-9 rounded-lg border px-2.5 text-[12px] font-bold ${followCam ? 'border-sky-400 text-sky-600' : 'border-slate-300 text-slate-500 dark:border-white/15 dark:text-slate-300'}`}>Follow</button>}
+                </>
+              )}
               <div className="mx-1 hidden h-6 w-px bg-slate-200 sm:block dark:bg-white/10" />
               <span className="hidden items-center gap-1 text-[11px] font-bold tracking-wide text-slate-400 uppercase sm:inline-flex dark:text-slate-500"><Gauge className="h-3.5 w-3.5" /> Speed</span>
               <div className="flex rounded-lg bg-slate-900/[.05] p-0.5 dark:bg-white/[.07]" role="group" aria-label="Simulation speed">
@@ -331,6 +400,7 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
               <Stat label="seed" value={String(seed)} accent />
             </div>
           </div>
+          {sim.diagnostics && <div className="mt-3"><DiagnosticsPanel samples={diagSamples as never} /></div>}
 
           <p className="mt-3 flex items-start gap-2 text-[12px] leading-relaxed text-slate-400 dark:text-slate-500">
             <Braces className="mt-0.5 h-3.5 w-3.5 shrink-0" />

@@ -2,6 +2,13 @@
 
 import type { Grid } from './grid';
 
+function pushVarint(out: number[], n: number): void {
+  let v = n >>> 0;
+  while (v >= 0x80) { out.push((v & 0x7f) | 0x80); v >>>= 7; }
+  out.push(v);
+}
+
+
 export interface GridDoc {
   w: number;
   h: number;
@@ -10,68 +17,7 @@ export interface GridDoc {
   cells: Uint8Array;
 }
 
-const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-const REVERSE = new Map<string, number>([...ALPHABET].map((c, i) => [c, i]));
-
-function bytesToB64url(bytes: Uint8Array): string {
-  let out = '';
-  for (let i = 0; i < bytes.length; i += 3) {
-    const a = bytes[i]!;
-    const b = bytes[i + 1];
-    const c = bytes[i + 2];
-    out += ALPHABET[a >> 2]!;
-    out += ALPHABET[((a & 3) << 4) | ((b ?? 0) >> 4)]!;
-    if (b !== undefined) out += ALPHABET[((b & 15) << 2) | ((c ?? 0) >> 6)]!;
-    if (c !== undefined) out += ALPHABET[c & 63]!;
-  }
-  return out;
-}
-
-function b64urlToBytes(s: string): Uint8Array | null {
-  const vals: number[] = [];
-  for (const ch of s) {
-    const v = REVERSE.get(ch);
-    if (v === undefined) return null;
-    vals.push(v);
-  }
-  const out: number[] = [];
-  for (let i = 0; i < vals.length; i += 4) {
-    const a = vals[i]!; const b = vals[i + 1]; const c = vals[i + 2]; const d = vals[i + 3];
-    if (b === undefined) return null;
-    out.push((a << 2) | (b >> 4));
-    if (c !== undefined) out.push(((b & 15) << 4) | (c >> 2));
-    if (d !== undefined) out.push(((c! & 3) << 6) | d);
-  }
-  return Uint8Array.from(out);
-}
-
-function pushVarint(out: number[], n: number): void {
-  let v = n >>> 0;
-  while (v >= 0x80) { out.push((v & 0x7f) | 0x80); v >>>= 7; }
-  out.push(v);
-}
-
-class Reader {
-  private pos = 0;
-  constructor(private bytes: Uint8Array) {}
-  get left(): number { return this.bytes.length - this.pos; }
-  byte(): number | null {
-    if (this.pos >= this.bytes.length) return null;
-    return this.bytes[this.pos++]!;
-  }
-  varint(): number | null {
-    let result = 0;
-    let shift = 0;
-    for (let i = 0; i < 4; i++) {
-      const b = this.byte();
-      if (b === null) return null;
-      result |= (b & 0x7f) << shift;
-      if ((b & 0x80) === 0) return result >>> 0;
-      shift += 7;
-    }
-    return null;
-  }
-}
+import { base64UrlToBytes as b64urlToBytes, bytesToBase64Url as bytesToB64url, ByteReader as Reader } from '../codec';
 
 export const MAX_DIM = 256;
 export const MAX_VALUE = 15;

@@ -15,12 +15,15 @@ export class SpatialHash {
   /** Item indices sorted by cell — exposed read-only for allocation-free queries. */
   readonly items: Int32Array;
 
+  readonly wrap: boolean;
   constructor(
     readonly w: number,
     readonly h: number,
     readonly cellSize: number,
     capacity: number,
+    wrap = true,
   ) {
+    this.wrap = wrap;
     this.cols = Math.max(3, Math.floor(w / cellSize));
     this.rows = Math.max(3, Math.floor(h / cellSize));
     const cells = this.cols * this.rows;
@@ -58,9 +61,11 @@ export class SpatialHash {
     const cy = Math.min(this.rows - 1, Math.max(0, Math.floor(py / this.cellSize)));
     let n = 0;
     for (let dy = -1; dy <= 1; dy++) {
-      const yy = (cy + dy + this.rows) % this.rows;
+      const yy = this.wrap ? (cy + dy + this.rows) % this.rows : cy + dy;
+      if (!this.wrap && (yy < 0 || yy >= this.rows)) continue;
       for (let dx = -1; dx <= 1; dx++) {
-        const xx = (cx + dx + this.cols) % this.cols;
+        const xx = this.wrap ? (cx + dx + this.cols) % this.cols : cx + dx;
+        if (!this.wrap && (xx < 0 || xx >= this.cols)) continue;
         const cell = yy * this.cols + xx;
         const end = this.start[cell + 1]!;
         for (let k = this.start[cell]!; k < end && n < out.length; k++) {

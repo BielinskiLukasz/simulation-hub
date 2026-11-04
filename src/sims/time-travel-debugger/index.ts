@@ -93,7 +93,7 @@ sim.render = (state, rc, view) => {
 };
 
 function emptyState(): State {
-  return init(defaultParams, { rng: undefined as never, schedule: () => 0 });
+  return init(defaultParams, { rng: undefined as never, shared: undefined as never, schedule: () => 0 });
 }
 
 export default sim;

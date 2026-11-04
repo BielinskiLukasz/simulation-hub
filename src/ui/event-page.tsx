@@ -20,10 +20,11 @@ import { mountTimeline, type TimelineHandle } from './timeline';
 
 const SPEEDS = [0.1, 0.25, 0.5, 1, 2, 5, 20] as const;
 const WORLD = { w: 800, h: 600 };
-type Tab = 'controls' | 'actions' | 'log' | 'concepts' | 'extra';
+type Tab = 'controls' | 'actions' | 'log' | 'concepts' | 'extra' | 'editor';
 
 export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: EventSimulation<any, any, any, any>; query: URLSearchParams; theme: ThemeName }) {
   const [params, setParams] = useState<Record<string, any> | null>(null);
+  const [input, setInput] = useState<unknown>(null);
   const [seed, setSeed] = useState(42);
   const [tab, setTab] = useState<Tab>('controls');
   const [playing, setPlaying] = useState(true);
@@ -39,6 +40,9 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
   const timelineRef = useRef<TimelineHandle | null>(null);
   const extraHostRef = useRef<HTMLDivElement>(null);
   const extraRef = useRef<{ dispose(): void } | null>(null);
+  const editorHostRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<{ dispose(): void } | null>(null);
+  const inputRef = useRef<unknown>(null);
   const playerRef = useRef<Player<any, any, any, any> | null>(null);
   const playingRef = useRef(playing);
   playingRef.current = playing;
@@ -54,6 +58,12 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
     if (player && player.inputLog.length > 0) {
       const encoded = JSON.stringify(player.inputLog.map((i) => ({ at: i.atEvent, a: i.action })));
       if (encoded.length <= 1800) qs.set('actions', encoded); // longer sessions: Export JSON
+    }
+    if (sim.input && inputRef.current !== null && inputRef.current !== undefined) {
+      try {
+        const encodedInput = sim.input.codec.encode(inputRef.current);
+        if (encodedInput && encodedInput.length <= 120000) qs.set('in', encodedInput);
+      } catch { /* unencodable input stays out of the URL */ }
     }
     history.replaceState(null, '', buildHash(entry.meta.id, qs));
   }, [entry.meta.id, sim]);
@@ -75,7 +85,22 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
     const decoded = decodeState(query, sim.defaultParams, sim.paramSchema);
     setParams(decoded.params);
     setSeed(decoded.seed);
-    const player = new Player(sim, decoded.params, decoded.seed, { snapshotEvery: 200 });
+    let initialInput: unknown;
+    if (sim.input) {
+      initialInput = sim.input.initial(decoded.seed);
+      const rawIn = query.get('in');
+      if (rawIn) {
+        const parsed = sim.input.codec.decode(rawIn);
+        if (parsed !== null) initialInput = parsed;
+      }
+      // Input generators double as example loaders (Circuit).
+      const genId = query.get('gen');
+      const generator = sim.input.generators?.find((g) => g.id === genId);
+      if (generator) initialInput = generator.generate(initialInput, { ...generator.defaults }, { next: () => 0, range: (a: number) => a, int: (a: number) => a, pick: (items: readonly unknown[]) => items[0], state: () => decoded.seed } as never);
+      inputRef.current = initialInput;
+      setInput(initialInput);
+    }
+    const player = new Player(sim, decoded.params, decoded.seed, { snapshotEvery: 200, input: initialInput });
     playerRef.current = player;
 
     // replay a shared session's inputs, if the link carries them
@@ -117,12 +142,12 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
           const dt = Math.min((ts - lastTs) / 1000, 0.1);
           lastTs = ts;
           if (playingRef.current) player.advance(dt, speedRef.current);
-          sim.render(player.state, { ctx, width: WORLD.w, height: WORLD.h, theme: themeRef.current }, { now: player.now, head: player.head });
+          sim.render(player.state, { ctx, width: WORLD.w, height: WORLD.h, theme: themeRef.current }, { now: player.now, head: player.head }, player.shared);
           timelineRef.current?.setPlayhead(player.now);
           if (player.head !== lastHeadRef.current) {
             lastHeadRef.current = player.head;
             if (sim.deriveTimeline && timelineRef.current) {
-              timelineRef.current.setData(sim.deriveTimeline(player.log, player.now, player.params_), player.now);
+              timelineRef.current.setData(sim.deriveTimeline(player.log, player.now, player.params_, player.shared), player.now);
             }
             bump();
           }
@@ -137,7 +162,7 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
         follow: true,
         onSeek: (t) => { player.seekTime(Math.floor(t)); setPlaying(false); bump(); },
       });
-      timelineRef.current.setData(sim.deriveTimeline(player.log, player.now, player.params_), player.now);
+      timelineRef.current.setData(sim.deriveTimeline(player.log, player.now, player.params_, player.shared), player.now);
     }
     bump();
     return () => {
@@ -158,9 +183,36 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
   // extra tab mount/dispose
   useEffect(() => {
     if (tab !== 'extra' || !sim.mountExtraTab || !extraHostRef.current || !params) return;
-    extraRef.current = sim.mountExtraTab(extraHostRef.current, { params, seed, theme });
+    extraRef.current = sim.mountExtraTab(extraHostRef.current, { params, seed, theme, input: inputRef.current } as never);
     return () => { extraRef.current?.dispose(); extraRef.current = null; };
-  }, [tab, sim, params, seed, theme]);
+  }, [tab, sim, params, seed, theme, input]);
+
+  // Contract v5 custom editor (Circuit netlist editor)
+  useEffect(() => {
+    const editorSpec = sim.input?.editor;
+    if (tab !== 'editor' || !editorHostRef.current || !editorSpec || !('kind' in editorSpec)) return;
+    const spec = editorSpec;
+    const handle = spec.mount(editorHostRef.current, {
+      getInput: () => inputRef.current,
+      commit: (next: unknown, _label: string) => {
+        void _label;
+        inputRef.current = next;
+        setInput(next);
+        if (params) {
+          playerRef.current?.reset(params, seed, next);
+          setPlaying(true);
+          lastHeadRef.current = -1;
+          syncUrl(params, seed);
+        }
+        bump();
+      },
+      camera: { get: () => ({ cx: 0, cy: 0, zoom: 1 }), set: () => undefined, viewport: () => ({ scale: 1, offsetX: 0, offsetY: 0 }) },
+      signals: () => (playerRef.current && sim.getSignals ? sim.getSignals(playerRef.current.state, playerRef.current.shared) : null),
+      act: (action: unknown) => doAct(action),
+    });
+    editorRef.current = handle;
+    return () => { handle.dispose(); editorRef.current = null; };
+  }, [tab, sim, params, seed, bump, doAct, syncUrl]);
 
   const player = playerRef.current;
   const head = player?.head ?? 0;
@@ -169,7 +221,7 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
   const finished = player?.finished ?? false;
   const violations = useMemo(() => player?.invariantViolations() ?? [], [player, head]);
   const stats = player && sim.getStats ? sim.getStats(player.state) : null;
-  const actions = player && sim.getActions ? sim.getActions(player.state) : [];
+  const actions = player && sim.getActions ? sim.getActions(player.state, player.shared) : [];
 
   const applyParamsAndReset = useCallback((next: Record<string, any>, s: number) => {
     setParams(next);
@@ -221,7 +273,7 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * WORLD.w;
     const y = ((e.clientY - rect.top) / rect.height) * WORLD.h;
-    const action = sim.onCanvasAction(player.state, x, y, { shift: e.shiftKey, alt: e.altKey, button: e.button });
+    const action = sim.onCanvasAction(player.state, x, y, { shift: e.shiftKey, alt: e.altKey, button: e.button }, player.shared);
     if (action) doAct(action);
   };
 
@@ -336,6 +388,7 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
             <TabBtn active={tab === 'log'} onClick={() => setTab('log')} icon={<ScrollText className="h-4 w-4" />} label="Event log" />
             <TabBtn active={tab === 'concepts'} onClick={() => setTab('concepts')} icon={<BookOpen className="h-4 w-4" />} label="Concepts" />
             {sim.mountExtraTab && <TabBtn active={tab === 'extra'} onClick={() => setTab('extra')} icon={<Table2 className="h-4 w-4" />} label={sim.extraTabLabel ?? 'Compare'} />}
+            {(sim.input?.editor as { kind?: string } | undefined)?.kind === 'custom' && <TabBtn active={tab === 'editor'} onClick={() => setTab('editor')} icon={<MousePointer2 className="h-4 w-4" />} label="Editor" />}
           </div>
 
           <div className="nice-scroll max-h-[780px] overflow-y-auto p-4">
@@ -343,6 +396,25 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
               params ? (
                 <div className="space-y-5">
                   <Controls schema={sim.paramSchema} params={params} onChange={(k, v) => onControlChange(String(k), v)} />
+                  {sim.input?.generators && sim.input.generators.length > 0 && (
+                    <div>
+                      <div className="mb-1.5 text-[11px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">Load example / generate</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {sim.input.generators.map((g) => (
+                          <button key={g.id} onClick={() => {
+                            const next = g.generate(inputRef.current, { ...g.defaults }, { next: () => 0, range: (a: number) => a, int: (a: number) => a, pick: (items: readonly unknown[]) => items[0], state: () => seed } as never);
+                            inputRef.current = next;
+                            setInput(next);
+                            playerRef.current?.reset(params, seed, next);
+                            setPlaying(true);
+                            lastHeadRef.current = -1;
+                            syncUrl(params, seed);
+                            bump();
+                          }} className="rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-500 capitalize hover:border-rose-400 hover:text-rose-500 dark:border-white/15 dark:text-slate-300">{g.label}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {textEditorDef && (
                     <ProcessTableEditor
                       value={String(params[textEditorDef[0]])}
@@ -408,6 +480,7 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
             )}
 
             {tab === 'extra' && <div ref={extraHostRef} />}
+            {tab === 'editor' && <div ref={editorHostRef} />}
           </div>
         </aside>
       </div>

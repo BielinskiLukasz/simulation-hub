@@ -85,7 +85,7 @@ export function Hub({ entries, onRandom }: { entries: SimEntry[]; onRandom: () =
         {/* proof strip */}
         <div className="mx-auto mt-8 grid max-w-3xl grid-cols-2 gap-2 sm:grid-cols-4">
           {[
-            ['14', 'live simulations'], ['4 kinds', 'realtime, batch, event, trace'], ['Time-Travel', 'scrub, seek & branch'], ['210', 'unit tests green'],
+            ['17', 'live simulations'], ['4 kinds', 'realtime, batch, event, trace'], ['Time-Travel', 'scrub, seek & branch'], ['247', 'unit tests green'],
           ].map(([v, l]) => (
             <div key={l} className="rounded-2xl border border-slate-200 bg-white px-3 py-3 dark:border-white/10 dark:bg-white/[.04]">
               <div className="text-xl font-black text-slate-900 dark:text-white">{v}</div>
@@ -357,6 +357,32 @@ function SimCard({ entry }: { entry: SimEntry }) {
             <text x="40" y="140" fontSize="10" fill="#94a3b8" fontFamily="monospace">row-major 93.75%</text>
             <text x="170" y="140" fontSize="10" fill="#94a3b8" fontFamily="monospace">col-major 0%</text>
             <line x1="155" y1="16" x2="155" y2="120" stroke="rgba(148,163,184,0.4)" strokeDasharray="3 3" />
+          </svg>
+        )}
+        {m.thumbnail === 'nbody' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            <ellipse cx="150" cy="72" rx="105" ry="48" fill="none" stroke="rgba(56,189,248,0.35)" strokeWidth="1.5" strokeDasharray="3 4" />
+            <circle cx="150" cy="72" r="12" fill="#fbbf24" />
+            {([[70,50],[105,38],[196,44],[232,76],[188,108],[96,104]] as [number,number][]).map(([x,y],i) => <circle key={i} cx={x} cy={y} r={i%2?4:6} fill={['#38bdf8','#22d3ee','#fb7185','#a78bfa','#34d399','#f59e0b'][i]} />)}
+            <path d="M70 50 Q110 90 150 72 T232 76" fill="none" stroke="rgba(125,211,252,0.4)" strokeWidth="2" />
+          </svg>
+        )}
+        {m.thumbnail === 'cloth' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            {Array.from({length:6}).map((_,r) => Array.from({length:9}).map((_,c) => <circle key={`${r}-${c}`} cx={62+c*22} cy={24+r*18} r="3" fill={r===0?'#f43f5e':'#34d399'} />))}
+            {Array.from({length:5}).map((_,r) => <path key={r} d={`M62 ${24+r*18} Q150 ${54+r*18} 238 ${24+r*18}`} fill="none" stroke="#34d399" strokeWidth="1.6" opacity="0.75" />)}
+            <path d="M62 114 Q150 132 238 114" fill="none" stroke="#38bdf8" strokeWidth="2" />
+          </svg>
+        )}
+        {m.thumbnail === 'circuit' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            <path d="M62 44 H118 M62 92 H118 M158 68 H214" stroke="#22c55e" strokeWidth="3" />
+            <path d="M118 44 V92 M182 68 V112 H214" fill="none" stroke="#64748b" strokeWidth="2" />
+            <rect x="118" y="50" width="42" height="36" rx="6" fill="#111c2b" stroke="#e2e8f0" strokeWidth="1.5" />
+            <text x="139" y="72" textAnchor="middle" fontSize="10" fontWeight="800" fill="#e2e8f0">XOR</text>
+            <circle cx="228" cy="68" r="11" fill="#facc15" /><text x="228" y="72" textAnchor="middle" fontSize="9" fontWeight="900" fill="#713f12">S</text>
+            <rect x="30" y="36" width="32" height="16" rx="4" fill="#1e293b" stroke="#94a3b8" /><text x="46" y="47" textAnchor="middle" fontSize="9" fill="#e2e8f0">A=1</text>
+            <rect x="30" y="84" width="32" height="16" rx="4" fill="#1e293b" stroke="#94a3b8" /><text x="46" y="95" textAnchor="middle" fontSize="9" fill="#e2e8f0">B=0</text>
           </svg>
         )}
         <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-black tracking-wider text-white uppercase">

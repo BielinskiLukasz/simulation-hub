@@ -47,7 +47,7 @@ sim.render = (state, rc, view) => {
 };
 
 function emptyState(): State {
-  return gcSim.init(gcSim.defaultParams, { rng: undefined as never, schedule: () => 0 });
+  return gcSim.init(gcSim.defaultParams, { rng: undefined as never, shared: undefined as never, schedule: () => 0 });
 }
 
 export default sim;

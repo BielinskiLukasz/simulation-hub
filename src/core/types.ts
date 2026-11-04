@@ -38,11 +38,46 @@ export type ParamSchema<P> = { [K in keyof P]: ParamDef };
 
 export type ThemeName = 'light' | 'dark';
 
+export interface Camera { cx: number; cy: number; zoom: number }
+export interface Rect { x: number; y: number; w: number; h: number }
+
+export interface ViewInfo {
+  camera: Camera;
+  viewport: import('./input').Viewport;
+  worldRect: Rect;
+  dpr: number;
+  px(n: number): number;
+}
+
+export interface CameraSpec<S> {
+  initial(state: S): Camera;
+  fit?(state: S): Rect | null;
+  follow?(state: S): { x: number; y: number } | null;
+  minZoom: number;
+  maxZoom: number;
+  usesRightClick?: boolean;
+}
+
+export interface Diagnostics {
+  time: number;
+  energy?: { kinetic: number; potential: number };
+  momentum?: { x: number; y: number };
+  angularMomentum?: number;
+  extras?: Record<string, number>;
+  approximate?: boolean;
+}
+
+export interface DiagnosticsSpec<S> {
+  sample(state: S): Diagnostics;
+  everySteps(state: S): number;
+}
+
 export interface RenderContext {
   ctx: CanvasRenderingContext2D;
   width: number;
   height: number;
   theme: ThemeName;
+  view?: ViewInfo;
 }
 
 export interface Rng {
@@ -74,6 +109,10 @@ export interface RealtimeSimulation<P, S> {
   /** Contract v4: live grid editing (Falling sand). Edits apply on step boundaries. */
   editor?: GridEditorSpec<S>;
   onEdit?(state: S, edit: GridEdit): S;
+  /** Contract v5: camera, conserved-quantity diagnostics, realtime compare. */
+  camera?: CameraSpec<S>;
+  diagnostics?: DiagnosticsSpec<S>;
+  compare?: CompareSpec<Record<string, unknown>>;
   about: SimAbout;
   concepts?: string;
 }
@@ -117,12 +156,13 @@ export interface LogEntry {
   data?: unknown;
 }
 
-export interface InitCtx<E> {
+export interface InitCtx<E, Sh = unknown> {
   readonly rng: Rng;
+  readonly shared: Sh;
   schedule(delay: number, payload: E): number;
 }
 
-export interface EventCtx<S, E> extends InitCtx<E> {
+export interface EventCtx<S, E, Sh = unknown> extends InitCtx<E, Sh> {
   readonly state: S;
   readonly now: number;
   cancel(eventId: number): void;
@@ -141,18 +181,20 @@ export interface TimelineData {
   markers: { lane?: string; t: number; label: string; cls: string }[];
 }
 
-export interface EventSimulation<P, S, E, A> {
+export interface EventSimulation<P, S, E, A, I = unknown, Sh = unknown> {
   kind: 'event';
   meta: SimMeta;
   defaultParams: P;
   paramSchema: ParamSchema<P>;
-  playback: { unit: string; baseRate: number }; // sim units per real second at 1×
-  init(params: P, ctx: InitCtx<E>): S;
-  handle(ctx: EventCtx<S, E>, ev: E): void;
-  applyAction?(ctx: EventCtx<S, E>, action: A): void;
-  render(state: S, rc: RenderContext, view: { now: number; head: number }): void;
+  playback: { unit: string; baseRate: number }; // sim units per real second at 1x
+  input?: InputSpec<I>;
+  compile?(params: P, input: I): Sh;
+  init(params: P, ctx: InitCtx<E, Sh>): S;
+  handle(ctx: EventCtx<S, E, Sh>, ev: E): void;
+  applyAction?(ctx: EventCtx<S, E, Sh>, action: A): void;
+  render(state: S, rc: RenderContext, view: { now: number; head: number }, shared?: Sh): void;
   describeAction?(action: A): string;
-  deriveTimeline?(log: readonly LogEntry[], now: number, params: P): TimelineData;
+  deriveTimeline?(log: readonly LogEntry[], now: number, params: P, shared?: Sh): TimelineData;
   invariants?: Invariant<S>[];
   defaultHiddenCategories?: string[];
   getStats?(state: S): Record<string, number | string>;
@@ -160,10 +202,11 @@ export interface EventSimulation<P, S, E, A> {
   about: SimAbout;
   concepts?: string; // markdown-lite, rendered in the Concepts tab
   /** Shell hooks (optional): canvas clicks and action buttons. */
-  onCanvasAction?(state: S, x: number, y: number, ev: { shift: boolean; alt: boolean; button: number }): A | null;
-  getActions?(state: S): { label: string; action: A }[];
+  onCanvasAction?(state: S, x: number, y: number, ev: { shift: boolean; alt: boolean; button: number }, shared?: Sh): A | null;
+  getActions?(state: S, shared?: Sh): { label: string; action: A }[];
   mountExtraTab?(host: HTMLElement, ctx: { params: P; seed: number; theme: ThemeName }): { dispose(): void };
   extraTabLabel?: string;
+  getSignals?(state: S, shared: Sh): ArrayLike<number> | null;
 }
 
 // ── Contract v4: editable grids & precomputed traces ────────────────────────
@@ -226,11 +269,30 @@ export interface InputGenerator<I> {
   generate(current: I, params: Record<string, number | string | boolean>, rng: Rng): I;
 }
 
+export interface CustomEditorCtx<I> {
+  getInput(): I;
+  commit(next: I, label: string): void;
+  camera: { get(): Camera; set(c: Camera): void; viewport(): import('./input').Viewport };
+  signals?(): ArrayLike<number> | null;
+  act?(action: unknown): void;
+}
+
+export interface CustomEditorHandle {
+  setMode(mode: 'edit' | 'simulate'): void;
+  renderOverlay(ctx: CanvasRenderingContext2D, view: ViewInfo): void;
+  dispose(): void;
+}
+
+export interface CustomEditorSpec<I> {
+  kind: 'custom';
+  mount(host: HTMLElement, ctx: CustomEditorCtx<I>): CustomEditorHandle;
+}
+
 export interface InputSpec<I> {
   initial(seed: number): I;
   codec: { encode(i: I): string; decode(s: string): I | null };
   generators?: InputGenerator<I>[];
-  editor?: GridEditorSpec<I>;
+  editor?: GridEditorSpec<I> | CustomEditorSpec<I>;
 }
 
 export interface CompareMode<P> {

@@ -9,8 +9,16 @@ import type { State } from './logic';
 export function render(state: State, rc: RenderContext): void {
   const { ctx, width, height, theme } = rc;
   const dark = theme === 'dark';
+  const view = rc.view;
   ctx.fillStyle = dark ? '#070b12' : '#eef2f8';
-  ctx.fillRect(0, 0, width, height);
+  if (view) {
+    ctx.save();
+    ctx.translate(view.viewport.offsetX, view.viewport.offsetY);
+    ctx.scale(view.viewport.scale, view.viewport.scale);
+    ctx.fillRect(view.worldRect.x, view.worldRect.y, view.worldRect.w, view.worldRect.h);
+  } else {
+    ctx.fillRect(0, 0, width, height);
+  }
 
   const { x, y, vx, vy, n, params } = state;
   const mode = params.colorBy;
@@ -67,4 +75,7 @@ export function render(state: State, rc: RenderContext): void {
     ctx.closePath();
   }
   if (state.predators.length > 0) { ctx.fillStyle = '#ef4444'; ctx.fill(); }
+  if (view) ctx.restore();
 }
+
+// camera restore appended by wrapper below

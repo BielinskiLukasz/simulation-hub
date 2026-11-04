@@ -9,12 +9,20 @@ export function bindPointer(
   canvas: HTMLCanvasElement,
   world: { w: number; h: number },
   onEvent: (ev: PointerEv) => void,
+  getViewport?: () => { scale: number; offsetX: number; offsetY: number } | null,
 ): () => void {
   const prevTouchAction = canvas.style.touchAction;
   canvas.style.touchAction = 'none';
 
   const toEvent = (e: PointerEvent, type: PointerEv['type']): PointerEv => {
     const rect = canvas.getBoundingClientRect();
+    const vp = getViewport?.();
+    if (vp) {
+      const sx = ((e.clientX - rect.left) / Math.max(1, rect.width)) * world.w;
+      const sy = ((e.clientY - rect.top) / Math.max(1, rect.height)) * world.h;
+      const p = screenToWorld(sx, sy, vp);
+      return { type, x: p.x, y: p.y, button: e.button, shift: e.shiftKey, alt: e.altKey, pressed: e.buttons > 0 };
+    }
     const scale = rect.width > 0 ? rect.width / world.w : 1;
     const p = screenToWorld(e.clientX - rect.left, e.clientY - rect.top, { scale, offsetX: 0, offsetY: 0 });
     return {

@@ -20,8 +20,8 @@ interface Input<A> {
   action: A;
 }
 
-export class Player<P, S, E, A> {
-  private engine: Engine<P, S, E, A>;
+export class Player<P, S, E, A, I = unknown, Sh = unknown> {
+  private engine: Engine<P, S, E, A, I, Sh>;
   private snapshots = new Map<number, EngineSnapshot<S, E>>();
   private inputs: Input<A>[] = [];
   private snapshotEvery: number;
@@ -30,16 +30,20 @@ export class Player<P, S, E, A> {
   private _maxComputed = 0;
 
   constructor(
-    private sim: EventSimulation<P, S, E, A>,
+    private sim: EventSimulation<P, S, E, A, I, Sh>,
     private params: P,
     private seed: number,
-    opts: PlayerOptions = {},
+    opts: PlayerOptions & { input?: I } = {},
   ) {
     this.snapshotEvery = opts.snapshotEvery ?? 200;
     this.maxSnapshots = opts.maxSnapshots ?? 400;
-    this.engine = new Engine(sim, params, seed);
+    this.input = opts.input;
+    this.engine = new Engine(sim, params, seed, this.input);
     this.takeSnapshot();
   }
+
+  private input?: I;
+  get shared(): Sh { return this.engine.shared; }
 
   get state(): S { return this.engine.state; }
   get head(): number { return this.engine.head; }
@@ -129,10 +133,11 @@ export class Player<P, S, E, A> {
     return { branched, discarded };
   }
 
-  reset(params: P = this.params, seed: number = this.seed): void {
+  reset(params: P = this.params, seed: number = this.seed, input: I | undefined = this.input): void {
     this.params = params;
     this.seed = seed;
-    this.engine = new Engine(this.sim, params, seed);
+    this.input = input;
+    this.engine = new Engine(this.sim, params, seed, this.input);
     this.snapshots.clear();
     this.inputs = [];
     this._maxComputed = 0;

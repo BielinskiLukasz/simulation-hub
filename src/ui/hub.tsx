@@ -27,8 +27,8 @@ const THUMB_BALLS = [
 // in-page compare, and realtime sims (N-Body, Cloth, Ecosystem) have a
 // lockstep Compare button in their toolbar. Only genuinely future work stays.
 const ROADMAP = [
-  { title: 'Perf Recorder & Dashboards', cat: 'Platform', desc: 'Generalized time-series recorder, multi-chart dashboards, seed sweeps.', icon: '∿', phase: 'Phase 6' },
-  { title: 'Traffic & Road Editor', cat: 'Emergent', desc: 'Agent worlds at scale, patch-based road editing, junction routing.', icon: '⇄', phase: 'Phase 6' },
+  { title: 'City Growth & Scenarios', cat: 'Emergent', desc: 'WebGL overlays, named scenarios with "Try this" cards.', icon: '◫', phase: 'Phase 7' },
+  { title: 'Supply Chain & Factory', cat: 'Systems', desc: 'Little’s law with CIs, belts, buffers, bottleneck highlighting.', icon: '⇥', phase: 'Phase 7' },
 ];
 
 export function Hub({ entries, onRandom }: { entries: SimEntry[]; onRandom: () => void }) {
@@ -87,7 +87,7 @@ export function Hub({ entries, onRandom }: { entries: SimEntry[]; onRandom: () =
         {/* proof strip */}
         <div className="mx-auto mt-8 grid max-w-3xl grid-cols-2 gap-2 sm:grid-cols-4">
           {[
-            ['18', 'live simulations'], ['4 kinds', 'realtime, batch, event, trace'], ['Time-Travel', 'scrub, seek & branch'], ['256', 'unit tests green'],
+            ['21', 'live simulations'], ['4 kinds', 'realtime, batch, event, trace'], ['Time-Travel', 'scrub, seek & branch'], ['295', 'unit tests green'],
           ].map(([v, l]) => (
             <div key={l} className="rounded-2xl border border-slate-200 bg-white px-3 py-3 dark:border-white/10 dark:bg-white/[.04]">
               <div className="text-xl font-black text-slate-900 dark:text-white">{v}</div>
@@ -401,6 +401,40 @@ function SimCard({ entry }: { entry: SimEntry }) {
             <path d="M190 76 L160 110 M76 98 L70 58" stroke="rgba(244,63,94,0.5)" strokeWidth="1.2" strokeDasharray="3 3" />
             <ellipse cx="196" cy="78" rx="34" ry="26" fill="rgba(244,63,94,0.08)" />
             <ellipse cx="84" cy="92" rx="30" ry="22" fill="rgba(56,189,248,0.10)" />
+          </svg>
+        )}
+        {m.thumbnail === 'epidemic' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            {Array.from({ length: 44 }).map((_, i) => {
+              const ang = (i / 44) * Math.PI * 2;
+              const x = 150 + Math.cos(ang) * 52; const y = 72 + Math.sin(ang) * 46;
+              const status = i % 9 === 0 ? '#ef4444' : i % 5 === 0 ? '#22c55e' : i % 11 === 0 ? '#38bdf8' : '#475569';
+              return <circle key={i} cx={x} cy={y} r={i % 9 === 0 ? 4 : 2.6} fill={status} />;
+            })}
+            <circle cx="150" cy="72" r="62" fill="none" stroke="rgba(251,113,133,0.25)" strokeWidth="1" />
+            <text x="150" y="76" textAnchor="middle" fontSize="11" fontWeight="800" fill="#fb7185" fontFamily="monospace">R₀</text>
+          </svg>
+        )}
+        {m.thumbnail === 'market' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            <path d="M18 42 L60 40 L100 46 L126 44 L146 50 L168 48 L188 54 L206 52 L220 90 L232 104 L248 96 L266 74 L286 62" fill="none" stroke="#f43f5e" strokeWidth="2.4" />
+            {[0,1,2,3].map((i) => (
+              <g key={i}>
+                <rect x={210} y={16 + i * 12} width={62 - i * 10} height="8" rx="2" fill="rgba(244,63,94,0.35)" />
+                <rect x={210} y={82 + i * 12} width={40 + i * 12} height="8" rx="2" fill="rgba(34,197,94,0.35)" />
+              </g>
+            ))}
+            <text x="18" y="132" fontSize="9" fill="#94a3b8" fontFamily="monospace">flash crash · liquidity withdrawn</text>
+          </svg>
+        )}
+        {m.thumbnail === 'traffic' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            {Array.from({ length: 16 }).map((_, r) => Array.from({ length: 22 }).map((_, c) => {
+              const band = Math.abs(((c + r * 0.9) % 22) - 6) < 2;
+              return <rect key={`${r}-${c}`} x={28 + c * 11} y={14 + r * 7} width="10" height="6" fill={band ? '#ef4444' : `hsl(${90 + r * 4} 65% ${band ? 45 : 45}%)`} opacity={band ? 0.9 : 0.55} />;
+            }))}
+            <path d="M 232 118 L 216 104" stroke="#f8fafc" strokeWidth="2" />
+            <text x="28" y="136" fontSize="9" fill="#94a3b8" fontFamily="monospace">space-time: jams slope backwards</text>
           </svg>
         )}
         <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-black tracking-wider text-white uppercase">

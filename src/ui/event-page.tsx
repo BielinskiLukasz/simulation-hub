@@ -17,10 +17,13 @@ import { buildHash } from '../core/router';
 import { Controls } from './controls';
 import { ProcessTableEditor } from './process-table';
 import { mountTimeline, type TimelineHandle } from './timeline';
+import { MetricsRecorder } from '../core/metrics/recorder';
+import { Dashboard } from './dashboard';
+import { BatchPanel } from './batch-panel';
 
 const SPEEDS = [0.1, 0.25, 0.5, 1, 2, 5, 20] as const;
 const WORLD = { w: 800, h: 600 };
-type Tab = 'controls' | 'actions' | 'log' | 'concepts' | 'extra' | 'editor';
+type Tab = 'controls' | 'actions' | 'log' | 'concepts' | 'extra' | 'editor' | 'stats' | 'batch';
 
 export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: EventSimulation<any, any, any, any>; query: URLSearchParams; theme: ThemeName }) {
   const [params, setParams] = useState<Record<string, any> | null>(null);
@@ -32,7 +35,7 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState('');
   const [, setUiTick] = useState(0);
-  const bump = useCallback(() => setUiTick((v) => v + 1), []);
+  const bump = useCallback(() => { setUiTick((v) => v + 1); setRecRev((v) => v + 1); }, []);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -51,6 +54,9 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
   const themeRef = useRef(theme);
   themeRef.current = theme;
   const lastHeadRef = useRef(-1);
+  const recorderRef = useRef<MetricsRecorder | null>(null);
+  const metricsBufRef = useRef<Float64Array>(new Float64Array(0));
+  const [recRev, setRecRev] = useState(0);
 
   const syncUrl = useCallback((p: Record<string, any>, s: number) => {
     const qs = encodeState(p, sim.defaultParams, s);
@@ -71,6 +77,7 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
   const doAct = useCallback((action: unknown) => {
     const player = playerRef.current;
     if (!player) return;
+    recorderRef.current?.truncateAfter(player.now);
     const res = player.act(action);
     if (res.branched) {
       setToast(`Branched at event ${player.head}: discarded the old future (${res.discarded} later input${res.discarded === 1 ? '' : 's'})`);
@@ -102,6 +109,15 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
     }
     const player = new Player(sim, decoded.params, decoded.seed, { snapshotEvery: 200, input: initialInput });
     playerRef.current = player;
+    if (sim.metrics) {
+      const spec = sim.metrics;
+      const dt = spec.every.by === 'time' ? spec.every.dt : 1;
+      recorderRef.current = new MetricsRecorder(spec.metrics.map((m) => m.id), dt, 50000, spec.policy ?? 'cap');
+      metricsBufRef.current = new Float64Array(spec.metrics.length);
+      const rec = recorderRef.current;
+      spec.sample(player.state, player.shared, metricsBufRef.current);
+      rec.fill(player.now, metricsBufRef.current);
+    }
 
     // replay a shared session's inputs, if the link carries them
     try {
@@ -143,6 +159,9 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
           lastTs = ts;
           if (playingRef.current) player.advance(dt, speedRef.current);
           sim.render(player.state, { ctx, width: WORLD.w, height: WORLD.h, theme: themeRef.current }, { now: player.now, head: player.head }, player.shared);
+          if (recorderRef.current && sim.metrics) {
+            try { sim.metrics.sample(player.state, player.shared, metricsBufRef.current); recorderRef.current.fill(player.now, metricsBufRef.current); } catch { /* transient during reset */ }
+          }
           timelineRef.current?.setPlayhead(player.now);
           if (player.head !== lastHeadRef.current) {
             lastHeadRef.current = player.head;
@@ -160,7 +179,7 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
       timelineRef.current = mountTimeline(timelineHostRef.current, {
         theme: themeRef.current,
         follow: true,
-        onSeek: (t) => { player.seekTime(Math.floor(t)); setPlaying(false); bump(); },
+        onSeek: (t) => { player.seekTime(Math.floor(t)); recorderRef.current?.truncateAfter(player.now); setPlaying(false); bump(); },
       });
       timelineRef.current.setData(sim.deriveTimeline(player.log, player.now, player.params_, player.shared), player.now);
     }
@@ -479,6 +498,8 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
               </div>
             )}
 
+            {tab === 'stats' && <Dashboard key={recRev} spec={sim.metrics} rec={recorderRef.current?.view() ?? null} theme={theme} now={player?.now} />}
+            {tab === 'batch' && sim.batch && <BatchPanel spec={sim.batch} params={params ?? sim.defaultParams} />}
             {tab === 'extra' && <div ref={extraHostRef} />}
             {tab === 'editor' && <div ref={editorHostRef} />}
           </div>

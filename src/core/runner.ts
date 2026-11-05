@@ -34,6 +34,7 @@ export class Runner<P, S> {
   private running = false;
   private queue: PointerEv[] = [];
   private editQueue: GridEdit[] = [];
+  private actionQueue: string[] = [];
   private now: () => number;
 
   private fpsEma = new Ema(0.08);
@@ -90,6 +91,13 @@ export class Runner<P, S> {
     }
   }
 
+  /** Contract v6: queue a named action; applied at the next step boundary. */
+  action(id: string): void {
+    if (!this.sim.onAction) return;
+    if (this.paused) { this.state = this.sim.onAction(this.state, id); this.renderNow(); }
+    else this.actionQueue.push(id);
+  }
+
   tick(tsMs: number): void {
     if (this.lastTs === null) this.lastTs = tsMs;
     const rawDelta = tsMs - this.lastTs;
@@ -100,15 +108,7 @@ export class Runner<P, S> {
       this.frameMax.push(rawDelta);
     }
 
-    if (this.editQueue.length > 0 && this.sim.onEdit) {
-      for (const e of this.editQueue) this.state = this.sim.onEdit(this.state, e);
-      this.editQueue.length = 0;
-    }
-    // input lands on a step boundary, before any stepping, in order
-    if (this.queue.length > 0 && this.sim.onPointer) {
-      for (const ev of this.queue) this.state = this.sim.onPointer(this.state, ev);
-      this.queue.length = 0;
-    }
+    this.flushInputs();
 
     let steps = 0;
     if (!this.paused) {
@@ -143,6 +143,10 @@ export class Runner<P, S> {
   }
 
   private flushInputs(): void {
+    if (this.actionQueue.length > 0 && this.sim.onAction) {
+      for (const id of this.actionQueue) this.state = this.sim.onAction(this.state, id);
+      this.actionQueue.length = 0;
+    }
     if (this.editQueue.length > 0 && this.sim.onEdit) {
       for (const e of this.editQueue) this.state = this.sim.onEdit(this.state, e);
       this.editQueue.length = 0;
@@ -174,6 +178,7 @@ export class Runner<P, S> {
     this.lastTs = null;
     this.queue.length = 0;
     this.editQueue.length = 0;
+    this.actionQueue.length = 0;
     this.renderNow();
     this.onFrame?.();
   }

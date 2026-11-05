@@ -1,5 +1,16 @@
 # Changelog
 
+## Contract v6 — Phase 6 (Agents & Markets)
+
+- **Statistics library:** Welford/Chan moments, type-7 quantiles, histograms, Acklam normal quantile, table t-critical values, t-intervals, Wilson intervals, seeded bootstrap and paired differences — validated by known values and coverage simulations.
+- **Graph toolkit:** immutable CSR graphs, Erdős–Rényi / Watts–Strogatz / Barabási–Albert / lattice generators, degree moments, clustering, components, sampled path lengths, residual moments — with simple-graph property tests.
+- **Metrics recorder + dashboard:** columnar, idempotent grid sampling, truncation for time travel, cap/decimate policies, CSV; React dashboard with log-y, gaps, hidden charts and per-chart canvases.
+- **Batch runner:** cells × replicates over the worker pool, chunk-fixed seeds via `deriveSeed(base, r)` (common random numbers), per-cell CIs, Wilson indicators, conditional means, histograms and paired-difference significance; Markdown export.
+- **Epidemic on networks (event):** exact event-driven SIR/SEIR on CSR graphs, degree-targeted vs random vaccination, R₀/T theory panel, degree histogram theory, final-size prediction, batch attack-rate sweep with CIs.
+- **Order book (event):** price-time matching engine with generation-checked ids and a differential-tested reference model; agents (noise, market makers with withdrawal, trend, stop-loss), flash-crash scenario, invariant badge, metrics and crash-probability batch analysis.
+- **Traffic (realtime):** IDM ring road, Bayesian-free deterministic perturbations, phantom jam verified with backwards wave velocity, space-time heatmap and fundamental-diagram batch.
+- **Compare Mode** (Phase 5) remains live for realtime sims; the stale hub teaser was removed.
+
 ## Phase 5 addendum — Compare Mode shipped & Ecosystem simulator
 
 - **Compare Mode promoted from roadmap:** trace sims (Pathfinding, Cache Hierarchy) already had in-page compare; Phase 5 added realtime lockstep compare (`RunnerGroup`, mirrored input, linked cameras, `cmp`/`b.*` URLs) to N-Body, Cloth and now Ecosystem. The stale hub teaser was removed.

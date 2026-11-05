@@ -1,5 +1,19 @@
 # Architecture — Simulation Hub
 
+## Contract v6 (Phase 6) — agents, metrics, batch
+
+- Sim-agnostic `metrics` (declared metrics + deterministic sampling + charts) and an idempotent,
+  truncatable columnar recorder; the dashboard renders charts with CSV export.
+- `batch` on any sim kind: fixed chunking, common random numbers (`deriveSeed(base, r)` independent
+  of variant/sweep), per-cell t/Wilson CIs, conditional means and paired differences.
+- Statistics are treated as evidence: probabilities use Wilson intervals, bimodal outcomes report
+  P(major event) with conditional means, and every result header states N and the base seed.
+- Event sims keep compiled data in `shared` (never snapshotted); the epidemic graph and order-book
+  config live there.
+- v7 candidates: live compare for event sims (two Players on a shared time axis), generalized
+  presets/scenarios, WebGL overlays, supply-chain/factory models reusing the batch runner.
+
+
 ## Contract v5 (Phase 5) — physics, camera, diagnostics, circuits
 
 - Realtime sims may declare `camera` (pure math in `core/camera.ts`; gestures in

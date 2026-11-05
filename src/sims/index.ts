@@ -22,6 +22,9 @@ import { meta as nBody } from './n-body/meta';
 import { meta as cloth } from './cloth/meta';
 import { meta as circuit } from './circuit/meta';
 import { meta as ecosystem } from './ecosystem/meta';
+import { meta as epidemic } from './epidemic/meta';
+import { meta as orderBook } from './order-book/meta';
+import { meta as traffic } from './traffic/meta';
 
 // Order is STABLE and append-only: Phase 1 → Phase 4, in the order each sim
 // was added. New simulations go at the END, so adding one never reshuffles
@@ -47,4 +50,7 @@ export const entries: SimEntry[] = [
   { meta: cloth, load: () => import('./cloth/index') },
   { meta: circuit, load: () => import('./circuit/index') },
   { meta: ecosystem, load: () => import('./ecosystem/index') },
+  { meta: epidemic, load: () => import('./epidemic/index') },
+  { meta: orderBook, load: () => import('./order-book/index') },
+  { meta: traffic, load: () => import('./traffic/index') },
 ];

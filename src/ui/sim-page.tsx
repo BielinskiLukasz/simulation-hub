@@ -12,6 +12,9 @@ import {
 import type { AnySimulation, RealtimeSimulation, RenderContext, SimEntry, ThemeName } from '../core/types';
 import { Runner } from '../core/runner';
 import type { RunnerStats } from '../core/stats';
+import { Dashboard } from './dashboard';
+import { BatchPanel } from './batch-panel';
+import { MetricsRecorder } from '../core/metrics/recorder';
 import { decodeState, encodeState } from '../core/url-state';
 import { buildHash } from '../core/router';
 import { bindPointer } from './pointer';
@@ -31,7 +34,7 @@ import type { Camera as CameraState } from '../core/types';
 
 const SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
 const WORLD = { w: 800, h: 600 };
-type Tab = 'controls' | 'how' | 'state';
+type Tab = 'controls' | 'how' | 'state' | 'stats' | 'batch';
 
 export function SimPage({ entry, query, theme }: { entry: SimEntry; query: URLSearchParams; theme: ThemeName }) {
   const [sim, setSim] = useState<AnySimulation | null>(null);
@@ -89,6 +92,9 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
   followRef.current = followCam;
   const diagRecorderRef = useRef(new DiagnosticsRecorder());
   const [diagSamples, setDiagSamples] = useState<unknown[]>([]);
+  const metricsRecorderRef = useRef<MetricsRecorder | null>(null);
+  const metricsBufferRef = useRef<Float64Array>(new Float64Array(0));
+  const [metricsRev, setMetricsRev] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -199,14 +205,26 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
             onChange: () => runner?.renderOnce(),
           });
         }
-        if (sim.diagnostics) {
-          diagRecorderRef.current = new DiagnosticsRecorder();
-          const specDiag = sim.diagnostics;
-          runner.onStep = () => {
-            const every = Math.max(1, specDiag.everySteps(runner!.state));
-            if (runner!.stepCount % every === 0) diagRecorderRef.current.push(specDiag.sample(runner!.state));
-          };
+        const diag = sim.diagnostics;
+        const metrics = sim.metrics;
+        if (metrics) {
+          metricsRecorderRef.current = new MetricsRecorder(metrics.metrics.map((m) => m.id), 1, 20000, 'decimate');
+          metricsBufferRef.current = new Float64Array(metrics.metrics.length);
         }
+        let lastMetricsSample = 0;
+        runner.onStep = () => {
+          const r = runner!;
+          if (diag) {
+            const every = Math.max(1, diag.everySteps(r.state));
+            if (r.stepCount % every === 0) diagRecorderRef.current.push(diag.sample(r.state));
+          }
+          if (metrics && metricsRecorderRef.current) {
+            const everyN = metrics.every.by === 'steps' ? Math.max(1, metrics.every.n) : Math.max(1, Math.round(metrics.every.dt / (1 / 60)));
+            if (everyN > lastMetricsSample) lastMetricsSample = everyN;
+            metrics.sample(r.state, undefined, metricsBufferRef.current);
+            metricsRecorderRef.current.appendStep(r.stepCount, lastMetricsSample, metricsBufferRef.current);
+          }
+        };
         runner.start();
         if (sim.onPointer) {
           unbindPointer = bindPointer(canvas, WORLD, (ev) => runnerRef.current?.pointer(ev), sim.camera ? () => toViewport(cameraRef.current, WORLD) : undefined);
@@ -220,6 +238,7 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
           lastFrames = framesRef.current;
           setStats({ steps: runner.stepCount, time: runner.simTime, fps });
           if (sim.diagnostics) setDiagSamples([...diagRecorderRef.current.samples]);
+          if (sim.metrics) setMetricsRev((v) => v + 1);
           if (followRef.current && sim.camera?.follow) {
             const target = sim.camera.follow(runner.state);
             if (target) { cameraRef.current = followStep(cameraRef.current, target, 0.25, 0.35); runner.renderOnce(); }
@@ -378,6 +397,14 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
               </div>
             </div>
 
+            {sim.actions && sim.actions.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 px-3 py-2 dark:border-white/10">
+                {sim.actions.map((a) => (
+                  <button key={a.id} title={a.hint} onClick={() => runnerRef.current?.action(a.id)} className="rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-600 hover:border-amber-400 hover:text-amber-600 dark:border-white/15 dark:text-slate-300">{a.label}</button>
+                ))}
+                <span className="ml-auto font-mono text-[10px] text-slate-400">actions queue at step boundaries</span>
+              </div>
+            )}
             {sim.editor && <div ref={editorHostRef} className="border-b border-slate-200 px-3 py-2 dark:border-white/10" />}
             <div ref={wrapRef} className="relative w-full bg-[#0b0f17]">
               <canvas ref={canvasRef} className="block w-full" style={{ aspectRatio: '4 / 3' }} aria-label={`${meta.title} canvas`} />
@@ -412,6 +439,8 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
           <div className="flex border-b border-slate-200 dark:border-white/10" role="tablist" aria-label="Simulation panel">
             <TabBtn active={tab === 'controls'} onClick={() => setTab('controls')} icon={<SlidersHorizontal className="h-4 w-4" />} label="Controls" />
             <TabBtn active={tab === 'how'} onClick={() => setTab('how')} icon={<BookOpen className="h-4 w-4" />} label="How it works" />
+            {sim.metrics && <TabBtn active={tab === 'stats'} onClick={() => setTab('stats')} icon={<Activity className="h-4 w-4" />} label="Metrics" />}
+            {sim.batch && <TabBtn active={tab === 'batch'} onClick={() => setTab('batch')} icon={<Gauge className="h-4 w-4" />} label="Batch" />}
             <TabBtn active={tab === 'state'} onClick={() => setTab('state')} icon={<Braces className="h-4 w-4" />} label="State" />
           </div>
 
@@ -464,6 +493,8 @@ function RealtimePage({ entry, sim, query, theme }: { entry: SimEntry; sim: Real
               </div>
             )}
 
+            {tab === 'stats' && <Dashboard key={metricsRev} spec={sim.metrics} rec={metricsRecorderRef.current?.view() ?? null} theme={theme} now={stats.time} />}
+            {tab === 'batch' && sim.batch && <BatchPanel spec={sim.batch} params={params ?? sim.defaultParams} />}
             {tab === 'state' && params && (
               <div className="space-y-4">
                 <div>

@@ -95,12 +95,57 @@ export interface SimAbout {
   invariant: string;
 }
 
+export interface MetricDef { id: string; label: string; unit?: string; fmt?: 'int' | 'float' | 'pct' | 'price' }
+
+export interface ChartSpec {
+  id: string; title: string;
+  kind: 'lines' | 'area' | 'bars' | 'xy';
+  series: string[];
+  x?: string;
+  yLog?: boolean; height?: number; hideByDefault?: boolean;
+}
+
+export interface MetricsSpec<S, Sh = unknown> {
+  metrics: MetricDef[];
+  sample(state: S, shared: Sh, out: Float64Array): void;
+  every: { by: 'time'; dt: number } | { by: 'steps'; n: number };
+  policy?: 'cap' | 'decimate';
+  charts: ChartSpec[];
+}
+
+export interface RecorderView {
+  readonly length: number;
+  times: Float64Array;
+  col(id: string): Float64Array;
+}
+
+export interface PanelCtx { camera?: { get(): Camera } }
+export interface PanelHandle<S, Sh> {
+  update(u: { state: S; shared: Sh; now: number; head: number; rec: RecorderView }): void;
+  dispose(): void;
+}
+export interface PanelSpec<S, Sh = unknown> { id: string; title: string; mount(host: HTMLElement, ctx: PanelCtx): PanelHandle<S, Sh> }
+
+export interface ActionSpec { id: string; label: string; hint?: string }
+
+export interface BatchMetricDef { id: string; label: string; kind: 'scalar' | 'indicator'; unit?: string }
+export interface BatchSeriesDef { id: string; label: string; dt: number; n: number }
+export interface BatchSpec<P> {
+  metrics: BatchMetricDef[];
+  series?: BatchSeriesDef[];
+  runOne(params: P, seed: number): { values: Float64Array; series?: Float32Array[] };
+  variants?: { id: string; label: string; overrides: Partial<P> }[];
+  sweep?: { key: keyof P; label: string; values: number[] };
+  conditional?: { id: string; on: string };
+  defaults: { runs: number; maxRuns: number };
+}
+
 export interface RealtimeSimulation<P, S> {
   kind: 'realtime';
   meta: SimMeta;
   defaultParams: P;
   paramSchema: ParamSchema<P>;
-  init(params: P, rng: Rng): S;
+  init(params: P, rng: Rng, input?: unknown): S;
   step(state: S, dt: number): S;
   render(state: S, rc: RenderContext): void;
   applyParams?(state: S, params: P): S;
@@ -113,6 +158,13 @@ export interface RealtimeSimulation<P, S> {
   camera?: CameraSpec<S>;
   diagnostics?: DiagnosticsSpec<S>;
   compare?: CompareSpec<Record<string, unknown>>;
+  /** Contract v6 */
+  metrics?: MetricsSpec<S>;
+  panels?: PanelSpec<S>[];
+  actions?: ActionSpec[];
+  onAction?(state: S, id: string): S;
+  input?: InputSpec<unknown>;
+  batch?: BatchSpec<P>;
   about: SimAbout;
   concepts?: string;
 }
@@ -188,7 +240,7 @@ export interface EventSimulation<P, S, E, A, I = unknown, Sh = unknown> {
   paramSchema: ParamSchema<P>;
   playback: { unit: string; baseRate: number }; // sim units per real second at 1x
   input?: InputSpec<I>;
-  compile?(params: P, input: I): Sh;
+  compile?(params: P, input: I, seed?: number): Sh;
   init(params: P, ctx: InitCtx<E, Sh>): S;
   handle(ctx: EventCtx<S, E, Sh>, ev: E): void;
   applyAction?(ctx: EventCtx<S, E, Sh>, action: A): void;
@@ -197,7 +249,7 @@ export interface EventSimulation<P, S, E, A, I = unknown, Sh = unknown> {
   deriveTimeline?(log: readonly LogEntry[], now: number, params: P, shared?: Sh): TimelineData;
   invariants?: Invariant<S>[];
   defaultHiddenCategories?: string[];
-  getStats?(state: S): Record<string, number | string>;
+  getStats?(state: S, shared?: Sh): Record<string, number | string>;
   isFinished?(state: S): boolean;
   about: SimAbout;
   concepts?: string; // markdown-lite, rendered in the Concepts tab
@@ -207,6 +259,10 @@ export interface EventSimulation<P, S, E, A, I = unknown, Sh = unknown> {
   mountExtraTab?(host: HTMLElement, ctx: { params: P; seed: number; theme: ThemeName }): { dispose(): void };
   extraTabLabel?: string;
   getSignals?(state: S, shared: Sh): ArrayLike<number> | null;
+  /** Contract v6 */
+  metrics?: MetricsSpec<S, Sh>;
+  panels?: PanelSpec<S, Sh>[];
+  batch?: BatchSpec<P>;
 }
 
 // ── Contract v4: editable grids & precomputed traces ────────────────────────

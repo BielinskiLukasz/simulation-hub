@@ -1,7 +1,7 @@
 import type { CompareSpec, Diagnostics, RealtimeSimulation } from '../../core/types';
 import { meta } from './meta';
 import {
-  applyParams, defaultParams, diagnosticsExtras, init, onPointer, paramSchema, step,
+  applyParams, defaultParams, diagnosticsExtras, ecosystemBatch, init, onAction, onPointer, paramSchema, step,
   type Params, type State,
 } from './logic';
 import { render } from './render';
@@ -24,6 +24,44 @@ const sim: RealtimeSimulation<Params, State> = {
   render,
   applyParams,
   onPointer,
+  onAction,
+  actions: [
+    { id: 'calibrate', label: 'Calibrate LV from ABM', hint: 'Estimate α β δ γ from the trailing population trace and restart the ODE here.' },
+    { id: 'drought', label: 'Drought (clear grass)', hint: 'Clears grass until regrowth timers expire.' },
+    { id: 'release-predators', label: 'Release 12 predators', hint: 'Adds predators; the batch may go extinct.' },
+  ],
+  metrics: {
+    metrics: [
+      { id: 'plants', label: 'Plants', fmt: 'int' },
+      { id: 'prey', label: 'Prey', fmt: 'int' },
+      { id: 'pred', label: 'Predators', fmt: 'int' },
+      { id: 'grassFrac', label: 'Grass fraction', fmt: 'pct' },
+      { id: 'meanPreyEnergy', label: 'Mean prey energy', fmt: 'float' },
+      { id: 'lvPrey', label: 'LV prey (ODE)', fmt: 'float' },
+      { id: 'lvPred', label: 'LV predators (ODE)', fmt: 'float' },
+    ],
+    sample: (s, _sh, out) => {
+      out[0] = s.counts[0]!;
+      out[1] = s.counts[1]!;
+      out[2] = s.counts[2]!;
+      let grass = 0;
+      for (let i = 0; i < s.grass.length; i++) if (s.grass[i] === 1) grass++;
+      out[3] = s.grass.length ? grass / s.grass.length : 0;
+      let e = 0;
+      for (let i = 0; i < s.n; i++) if (s.species[i] === 1) e += s.energy[i]!;
+      out[4] = s.counts[1]! > 0 ? e / s.counts[1]! : NaN;
+      out[5] = s.lv ? s.lv.prey : NaN;
+      out[6] = s.lv ? s.lv.pred : NaN;
+    },
+    every: { by: 'steps', n: 5 },
+    policy: 'decimate',
+    charts: [
+      { id: 'populations', title: 'Populations (ABM + Lotka–Volterra)', kind: 'lines', series: ['prey', 'pred', 'lvPrey', 'lvPred'] },
+      { id: 'phase', title: 'Phase plot: prey × predators', kind: 'xy', x: 'prey', series: ['pred', 'lvPred'] },
+      { id: 'grass', title: 'Grass fraction & mean prey energy', kind: 'lines', series: ['grassFrac', 'meanPreyEnergy'], hideByDefault: true },
+    ],
+  },
+  batch: ecosystemBatch,
   getStats: (s) => ({
     plants: s.counts[0]!,
     herbivores: s.counts[1]!,

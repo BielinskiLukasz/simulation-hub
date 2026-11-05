@@ -39,7 +39,7 @@ Every simulation run is bit-identical and shareable via its URL hash (e.g. `#/si
 ```bash
 npm install
 npm run dev        # dev server
-npm test           # Vitest — 295 tests, node environment (core needs no DOM)
+npm test           # Vitest — 296 tests, node environment (core needs no DOM)
 npm run lint       # ESLint, incl. the architecture rules below
 npm run typecheck  # tsc --noEmit (strict + noUncheckedIndexedAccess)
 npm run build      # production build

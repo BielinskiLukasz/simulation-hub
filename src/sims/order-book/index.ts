@@ -53,6 +53,21 @@ const sim: EventSimulation<Params, State, MarketEvent, MarketAction, unknown, Sh
     { label: 'Institutional shock (sell)', action: { a: 'shock', side: SIDE_SELL, qty: 120 } as MarketAction },
     { label: 'Halt 2 s', action: { a: 'halt', ms: 2000 } as MarketAction },
   ],
+  extraTabLabel: 'Book ladder',
+  mountExtraTab: (host, ctx) => {
+    const state = (ctx as unknown as { state?: State }).state;
+    const shared = (ctx as unknown as { shared?: Shared }).shared;
+    if (!state || !shared) return { dispose: () => { host.innerHTML = ''; } };
+    const container = document.createElement('div');
+    host.append(container);
+    let disposed = false;
+    void Promise.all([import('react'), import('react-dom/client')]).then(([React, { createRoot }]) => {
+      if (disposed) return;
+      const root = createRoot(container);
+      root.render(React.createElement(BookLadder, { state, shared }));
+    });
+    return { dispose: () => { disposed = true; container.remove(); } };
+  },
   about: {
     summary:
       'A price-time-priority limit order book driven by heterogeneous agents. Market makers quote both sides, skew with inventory and withdraw under volatility; trend followers chase moves; stop-loss holders fire once; an institutional seller can trigger a cascade. Every invariant is checked continuously.',
@@ -68,5 +83,11 @@ const sim: EventSimulation<Params, State, MarketEvent, MarketAction, unknown, Sh
   concepts:
     '## Concepts\n\n**Price-time priority.** At each price, orders fill FIFO; better prices win first, and trades print at the resting price. Cancellations are O(1) through generation-checked ids, so a recycled slot can never be cancelled by a stale id.\n\n**Liquidity withdrawal.** Market makers are short volatility: when short-term price swings exceed a threshold they cancel quotes and step away. The cost of immediacy rises exactly when it is most valuable, amplifying the move.\n\n**Cascades.** A large market sell eats depth; trend followers sell into the fall; stop-losses fire once each. The batch panel measures how the probability of a crash depends on the number of market makers.\n\n**References.** Gould et al., *Limit order books* (2013); Farmer, Patelli & Zovko, *The predictive power of zero intelligence* (PNAS 2005); Kirilenko et al., *The Flash Crash* (2017); CFTC-SEC report (2010).\n\n*Stylized toy model: no queue-position optimisation, no hidden liquidity, no exchange latency distribution, no real data.*',
 };
+
+import { BookLadder } from './ladder';
+
+// Extra tab: live ladder, refreshed from the current engine state by the shell.
+const ladderSim = sim as typeof sim & { __ladder?: boolean };
+ladderSim.__ladder = true;
 
 export default sim;

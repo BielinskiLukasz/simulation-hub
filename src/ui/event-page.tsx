@@ -202,7 +202,7 @@ export function EventPage({ entry, sim, query, theme }: { entry: SimEntry; sim: 
   // extra tab mount/dispose
   useEffect(() => {
     if (tab !== 'extra' || !sim.mountExtraTab || !extraHostRef.current || !params) return;
-    extraRef.current = sim.mountExtraTab(extraHostRef.current, { params, seed, theme, input: inputRef.current } as never);
+    extraRef.current = sim.mountExtraTab(extraHostRef.current, { params, seed, theme, input: inputRef.current, state: playerRef.current?.state, shared: playerRef.current?.shared } as never);
     return () => { extraRef.current?.dispose(); extraRef.current = null; };
   }, [tab, sim, params, seed, theme, input]);
 

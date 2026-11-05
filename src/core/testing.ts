@@ -1,6 +1,6 @@
 // ─── core/testing.ts — frame-rate independence helpers ─────────────────────
 
-export function hashFloat64(arrays: readonly Float64Array[]): number {
+export function hashFloat64(arrays: readonly ArrayLike<number>[]): number {
   let hash = 0x811c9dc5;
   const view = new DataView(new ArrayBuffer(8));
   for (const arr of arrays) {

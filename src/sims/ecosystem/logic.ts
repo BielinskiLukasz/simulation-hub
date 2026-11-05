@@ -6,6 +6,9 @@
 import type { ParamSchema, Rng } from '../../core/types';
 import type { PointerEv } from '../../core/input';
 import { SpatialHash } from '../../core/spatial-hash';
+import { createRng } from '../../core/rng';
+import { lvStep, lvFirstIntegral, lvEquilibrium, estimateRates, type LVState } from './lv';
+import type { BatchSpec } from '../../core/types';
 
 export const PLANT = 0;
 export const HERB = 1;
@@ -24,6 +27,13 @@ export interface Params {
   metabolism: number;
   plantsToWin: number;
   territory: boolean;
+  lvMode: string;
+  alpha: number;
+  beta: number;
+  delta: number;
+  gamma: number;
+  grassRegrow: number;
+  grassEnergy: number;
 }
 
 export const defaultParams: Params = {
@@ -39,6 +49,13 @@ export const defaultParams: Params = {
   metabolism: 3,
   plantsToWin: 120,
   territory: true,
+  lvMode: 'measured',
+  alpha: 0.5,
+  beta: 0.002,
+  delta: 0.002,
+  gamma: 0.3,
+  grassRegrow: 2,
+  grassEnergy: 40,
 };
 
 export const paramSchema: ParamSchema<Params> = {
@@ -54,6 +71,13 @@ export const paramSchema: ParamSchema<Params> = {
   metabolism: { kind: 'range', label: 'Metabolism', min: 0.5, max: 15, step: 0.5, unit: '/s', live: true },
   plantsToWin: { kind: 'range', label: 'Reproduction plants needed', min: 20, max: 400, step: 10, live: true },
   territory: { kind: 'boolean', label: 'Show territory claim', live: true },
+  lvMode: { kind: 'select', label: 'Lotka–Volterra overlay', options: ['off', 'manual', 'measured'], live: true },
+  alpha: { kind: 'range', label: 'LV α (prey growth)', min: 0, max: 2, step: 0.01, live: true, group: 'ODE overlay' },
+  beta: { kind: 'range', label: 'LV β (predation)', min: 0, max: 0.02, step: 0.0005, live: true, group: 'ODE overlay' },
+  delta: { kind: 'range', label: 'LV δ (predator growth)', min: 0, max: 0.02, step: 0.0005, live: true, group: 'ODE overlay' },
+  gamma: { kind: 'range', label: 'LV γ (predator death)', min: 0, max: 2, step: 0.01, live: true, group: 'ODE overlay' },
+  grassRegrow: { kind: 'range', label: 'Grass regrow ticks', min: 10, max: 240, step: 5, live: true, group: 'Grass grid' },
+  grassEnergy: { kind: 'range', label: 'Energy per grass cell', min: 5, max: 160, step: 5, live: true, group: 'Grass grid' },
 };
 
 export const WORLD = { w: 800, h: 600 } as const;
@@ -81,6 +105,13 @@ export interface State {
   eaten: [number, number];
   rng: Rng;
   params: Params;
+  grass: Uint8Array;
+  regrow: Uint16Array;
+  lv: LVState | null;
+  integralPrey: number;
+  integralPred: number;
+  integralProduct: number;
+  grassEaten: number;
 }
 
 export function init(params: Params, rng: Rng): State {
@@ -98,6 +129,13 @@ export function init(params: Params, rng: Rng): State {
     hash: new SpatialHash(WORLD.w, WORLD.h, Math.max(40, params.perception), CAPACITY, false),
     scratch: new Int32Array(CAPACITY),
     regrowCarry: 0,
+    grass: (() => { const g = new Uint8Array(60 * 40); g.fill(1); return g; })(),
+    regrow: new Uint16Array(60 * 40),
+    lv: params.lvMode === 'off' ? null : { prey: params.herbivores, pred: params.predators, time: 0, alpha: params.alpha, beta: params.beta, delta: params.delta, gamma: params.gamma },
+    integralPrey: 0,
+    integralPred: 0,
+    integralProduct: 0,
+    grassEaten: 0,
     time: 0,
     births: [0, 0, 0],
     deaths: [0, 0, 0],
@@ -159,6 +197,23 @@ function claimTerritory(state: State, x: number, y: number, species: number, amo
 
 export function step(state: State, dt: number): State {
   const p = state.params;
+  // Grass grid: regrow eaten cells and consume under grazers.
+  for (let c = 0; c < state.regrow.length; c++) if (state.regrow[c]! > 0) {
+    state.regrow[c] = state.regrow[c]! - 1;
+    if (state.regrow[c]! <= 0) state.grass[c] = 1;
+  }
+  if (state.lv && p.lvMode !== 'off') {
+    if (p.lvMode === 'measured' && state.time > 20 && state.integralPrey > 0 && state.integralPred > 0 && state.integralProduct > 0) {
+      const rates = estimateRates({
+        integralPrey: state.integralPrey, integralPred: state.integralPred, integralProduct: state.integralProduct,
+        preyBorn: state.births[HERB]!, preyEaten: state.eaten[0]!, preyStarved: state.deaths[HERB]!,
+        predBorn: state.births[PRED]!, predStarved: state.deaths[PRED]!,
+        meanPrey: state.counts[HERB]!, meanPred: state.counts[PRED]!,
+      });
+      state.lv.alpha = rates.alpha; state.lv.beta = rates.beta; state.lv.delta = rates.delta; state.lv.gamma = rates.gamma;
+    }
+    lvStep(state.lv, dt);
+  }
   const rng = state.rng;
   for (let i = 0; i < state.claim.length; i++) state.claim[i] = state.claim[i]! * 0.996;
   state.regrowCarry += p.plantRegrowth * dt;
@@ -230,6 +285,17 @@ export function step(state: State, dt: number): State {
     if (ny < 4) { ny = 4; state.vy[i] = Math.abs(state.vy[i]!); }
     if (ny > WORLD.h - 4) { ny = WORLD.h - 4; state.vy[i] = -Math.abs(state.vy[i]!); }
     state.x[i] = nx; state.y[i] = ny;
+    if (species === HERB) {
+      const gx = Math.min(59, Math.max(0, Math.floor((nx / WORLD.w) * 60)));
+      const gy = Math.min(39, Math.max(0, Math.floor((ny / WORLD.h) * 40)));
+      const cell = gy * 60 + gx;
+      if (state.grass[cell] === 1) {
+        state.grass[cell] = 0;
+        state.regrow[cell] = Math.max(10, Math.round(p.grassRegrow));
+        state.energy[i] = state.energy[i]! + p.grassEnergy;
+        state.grassEaten++;
+      }
+    }
     state.energy[i] = state.energy[i]! - p.metabolism * dt;
     claimTerritory(state, nx, ny, species, dt * (isPred ? 0.05 : 0.02));
 
@@ -251,6 +317,11 @@ export function step(state: State, dt: number): State {
     }
   }
   compact(state);
+  const prey = state.counts[HERB]!;
+  const pred = state.counts[PRED]!;
+  state.integralPrey += prey * dt;
+  state.integralPred += pred * dt;
+  state.integralProduct += prey * pred * dt;
   state.time += dt;
   return state;
 }
@@ -305,3 +376,63 @@ export function diagnosticsExtras(state: State): Record<string, number> {
     eaten: state.eaten[0]! + state.eaten[1]!,
   };
 }
+
+
+/** Contract v6 actions: calibrate the ODE, drought a patch, release predators. */
+export function onAction(state: State, id: string): State {
+  const rng = state.rng;
+  if (id === 'calibrate') {
+    if (state.lv) {
+      state.lv.prey = state.counts[HERB]!;
+      state.lv.pred = state.counts[PRED]!;
+      if (state.integralPrey > 0 && state.integralPred > 0 && state.integralProduct > 0) {
+        const rates = estimateRates({
+          integralPrey: state.integralPrey, integralPred: state.integralPred, integralProduct: state.integralProduct,
+          preyBorn: state.births[HERB]!, preyEaten: state.eaten[0]!, preyStarved: state.deaths[HERB]!,
+          predBorn: state.births[PRED]!, predStarved: state.deaths[PRED]!,
+          meanPrey: state.counts[HERB]!, meanPred: state.counts[PRED]!,
+        });
+        state.lv.alpha = rates.alpha; state.lv.beta = rates.beta; state.lv.delta = rates.delta; state.lv.gamma = rates.gamma;
+      }
+    }
+  } else if (id === 'drought') {
+    for (let c = 0; c < state.grass.length; c++) { state.grass[c] = 0; state.regrow[c] = Math.max(60, Math.round(state.params.grassRegrow * 1.5)); }
+  } else if (id === 'release-predators') {
+    for (let k = 0; k < 12; k++) spawn(state, PRED, rng.range(40, WORLD.w - 40), rng.range(40, WORLD.h - 40), 120);
+  }
+  return state;
+}
+
+export const ecosystemBatch: BatchSpec<Params> = {
+  metrics: [
+    { id: 'extinctPrey', label: 'Prey extinction', kind: 'indicator' },
+    { id: 'extinctPred', label: 'Predator extinction', kind: 'indicator' },
+    { id: 'meanPrey', label: 'Mean prey', kind: 'scalar' },
+    { id: 'meanPred', label: 'Mean predators', kind: 'scalar' },
+    { id: 'oscillates', label: 'Oscillates', kind: 'indicator' },
+  ],
+  series: [{ id: 'populations', label: 'populations', dt: 2, n: 30 }],
+  runOne(params, seed) {
+    const state = init({ ...params, lvMode: 'off' }, createRng(seed));
+    const series: number[] = [];
+    for (let i = 0; i < 900; i++) {
+      step(state, 1 / 60);
+      if (i % 60 === 0) series.push(state.counts[HERB]!);
+    }
+    const extinctPrey = state.counts[HERB] === 0 ? 1 : 0;
+    const extinctPred = state.counts[PRED] === 0 ? 1 : 0;
+    const prey = state.counts[HERB]!;
+    const pred = state.counts[PRED]!;
+    // Oscillation = at least two local predator maxima across the recorded series.
+    let peaks = 0;
+    for (let i = 1; i < series.length - 1; i++) if (series[i]! > series[i - 1]! && series[i]! >= series[i + 1]!) peaks++;
+    return {
+      values: Float64Array.from([extinctPrey, extinctPred, prey, pred, peaks >= 2 ? 1 : 0]),
+      series: [Float32Array.from(series)],
+    };
+  },
+  sweep: { key: 'plantRegrowth', label: 'regrowth', values: [15, 30, 45, 80, 120] },
+  defaults: { runs: 20, maxRuns: 100 },
+};
+
+export { lvFirstIntegral, lvEquilibrium };

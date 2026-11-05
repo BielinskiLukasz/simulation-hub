@@ -1,13 +1,13 @@
 # Simulation Hub
 
-**Phase 6 — Agents & Markets.** A deterministic simulation platform with **22 simulations across four execution paradigms** (real-time, batch, event, trace) under **Contract v6**:
+**Phase 6 — Agents & Markets.** A deterministic simulation platform with **21 simulations across four execution paradigms** (real-time, batch, event, trace) under **Contract v6**:
 
 | Sim | Kind | Showcases |
 |---|---|---|
-| **Epidemic on Networks** | event | Exact SIR/SEIR on ER/WS/BA, degree vs random vaccination, theory panel, batch Wilson CIs |
+| **Epidemic on Networks** | event | Exact event-driven SIR/SEIR on ER/WS/BA, degree vs random vaccination, theory panel, batch Wilson CIs |
 | **Order Book & Markets** | event | Price-time matching engine (differential-tested), MM liquidity withdrawal, flash-crash batch analysis |
-| **Traffic Flow** | realtime | IDM ring, phantom jams travelling backwards, space-time diagram, fundamental diagram via batch |
-| **Ecosystem & Spatial Agents** | realtime | Predator–prey energy web, non-wrapping spatial hash, territory overlay, lockstep compare |
+| **Traffic Flow** | realtime | IDM ring with optional signal, phantom jams travelling backwards, space-time diagram, FD via batch |
+| **Ecosystem & Spatial Agents** | realtime | Predator–prey energy web, Lotka–Volterra overlay + calibration, territory, lockstep compare, batch |
 | **N-Body Gravity** | realtime | Integrators, Barnes–Hut, energy diagnostics, camera, realtime compare |
 | **Soft Body & Cloth** | realtime | Verlet constraints, grab/cut/tear, wind, iterations compare |
 | **Circuit / Logic Gates** | event | 3-valued event logic, editor, waveforms, verified 4-bit adder |
@@ -39,7 +39,7 @@ Every simulation run is bit-identical and shareable via its URL hash (e.g. `#/si
 ```bash
 npm install
 npm run dev        # dev server
-npm test           # Vitest — 296 tests, node environment (core needs no DOM)
+npm test           # Vitest — 305 tests, node environment (core needs no DOM)
 npm run lint       # ESLint, incl. the architecture rules below
 npm run typecheck  # tsc --noEmit (strict + noUncheckedIndexedAccess)
 npm run build      # production build

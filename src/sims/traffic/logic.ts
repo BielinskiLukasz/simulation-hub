@@ -3,19 +3,18 @@
 // Ballistic update; speeds never negative; positions wrap modulo the ring.
 
 import type { ParamSchema, Rng } from '../../core/types';
-import { gridNetwork, stepNetwork, type NetState } from './network';
 
 export interface Params {
   vehicles: number; ringM: number; v0: number; timeGap: number; minGap: number;
   accel: number; decel: number; heterogeneity: number; truckFraction: number;
   noise: number; polarize: boolean;
-  scenario: string;
+  signal: boolean; signalAt: number; signalCycle: number; signalGreen: number;
 }
 
 export const defaultParams: Params = {
   vehicles: 22, ringM: 230, v0: 20, timeGap: 1, minGap: 2, accel: 1.5, decel: 2,
   heterogeneity: 0.05, truckFraction: 0.1, noise: 0, polarize: false,
-  scenario: 'ring',
+  signal: false, signalAt: 0.5, signalCycle: 30, signalGreen: 0.55,
 };
 
 export const paramSchema: ParamSchema<Params> = {
@@ -30,7 +29,10 @@ export const paramSchema: ParamSchema<Params> = {
   truckFraction: { kind: 'range', label: 'Truck fraction', min: 0, max: 0.5, step: 0.01 },
   noise: { kind: 'range', label: 'Acceleration noise', min: 0, max: 3, step: 0.1, live: true },
   polarize: { kind: 'boolean', label: 'Brake one car (perturbation)', live: true },
-  scenario: { kind: 'select', label: 'Scenario', options: ['ring', 'signalized-grid'], hint: '3×3 signalized grid with sources, sinks and lights' },
+  signal: { kind: 'boolean', label: 'Traffic light on ring', live: true },
+  signalAt: { kind: 'range', label: 'Stop line position', min: 0, max: 1, step: 0.05, hint: 'Fraction of ring' },
+  signalCycle: { kind: 'range', label: 'Light cycle', min: 5, max: 120, step: 1, unit: 's' },
+  signalGreen: { kind: 'range', label: 'Green fraction', min: 0.1, max: 0.9, step: 0.05 },
 };
 
 export const DT = 0.1;
@@ -43,7 +45,6 @@ export interface State {
   ring: number; time: number; perturbUntil: number; brakeIndex: number;
   speedHistory: Float32Array; historyCols: number; historyHead: number;
   params: Params; rng: Rng;
-  network: NetState | null;
 }
 
 const SUBSTEPS = 6;
@@ -56,7 +57,6 @@ export function init(params: Params, rng: Rng): State {
     perturbUntil: 0, brakeIndex: Math.floor(n / 2),
     speedHistory: new Float32Array(CELLS * HISTORY), historyCols: 0, historyHead: 0,
     params: { ...params }, rng,
-    network: params.scenario === 'signalized-grid' ? gridNetwork() : null,
   };
   const spacing = params.ringM / n;
   for (let i = 0; i < n; i++) {
@@ -78,11 +78,6 @@ export function idm(v: number, v0: number, gap: number, dv: number, T: number, s
 
 export function step(state: State, _dt: number): State {
   void _dt;
-  if (state.network) {
-    for (let sub = 0; sub < 4; sub++) stepNetwork(state.network, 0.25, state.rng);
-    state.time = state.network.time;
-    return state;
-  }
   const p = state.params;
   for (let sub = 0; sub < SUBSTEPS; sub++) {
     state.time += DT;
@@ -92,6 +87,17 @@ export function step(state: State, _dt: number): State {
       gap -= state.len[lead]!;
       const dv = state.vel[i]! - state.vel[lead]!;
       let a = idm(state.vel[i]!, state.v0[i]!, gap, dv, state.T[i]!, p.minGap, p.accel, p.decel);
+      if (p.signal && !signalIsGreen(state.time, p.signalCycle, p.signalGreen)) {
+        const stop = (((p.signalAt * state.ring) % state.ring) + state.ring) % state.ring;
+        let toLine = stop - state.pos[i]!;
+        if (toLine < 0) toLine += state.ring;
+        if (toLine < 70) {
+          // virtual stationary leader at the stop line: never cross on red
+          const aStop = idm(state.vel[i]!, state.v0[i]!, Math.max(0.2, toLine - state.len[i]!), state.vel[i]!, state.T[i]!, p.minGap, p.accel, p.decel);
+          a = Math.min(a, aStop);
+          if (toLine < 0.6) a = Math.min(a, -state.vel[i]! / DT);
+        }
+      }
       if (p.polarize && state.time < state.perturbUntil && i === state.brakeIndex % state.n) a -= 6;
       if (p.noise > 0) a += (state.rng.next() - 0.5) * p.noise;
       const vOld = state.vel[i]!;
@@ -117,6 +123,11 @@ export function step(state: State, _dt: number): State {
   state.historyHead = (col + 1) % HISTORY;
   state.historyCols = Math.min(HISTORY, state.historyCols + 1);
   return state;
+}
+
+export function signalIsGreen(t: number, cycle: number, greenFraction: number): boolean {
+  const phase = ((t % cycle) + cycle) % cycle;
+  return phase < cycle * greenFraction;
 }
 
 export function applyParams(state: State, params: Params): State { state.params = { ...params }; return state; }

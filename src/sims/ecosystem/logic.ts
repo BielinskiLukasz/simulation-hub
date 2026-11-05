@@ -6,9 +6,8 @@
 import type { ParamSchema, Rng } from '../../core/types';
 import type { PointerEv } from '../../core/input';
 import { SpatialHash } from '../../core/spatial-hash';
-import { createRng } from '../../core/rng';
-import { lvStep, lvFirstIntegral, lvEquilibrium, estimateRates, type LVState } from './lv';
-import type { BatchSpec } from '../../core/types';
+import { rk4 } from '../../core/ode';
+import { createRng, deriveSeed } from '../../core/rng';
 
 export const PLANT = 0;
 export const HERB = 1;
@@ -28,12 +27,7 @@ export interface Params {
   plantsToWin: number;
   territory: boolean;
   lvMode: string;
-  alpha: number;
-  beta: number;
-  delta: number;
-  gamma: number;
-  grassRegrow: number;
-  grassEnergy: number;
+  alpha: number; beta: number; delta: number; gamma: number;
 }
 
 export const defaultParams: Params = {
@@ -49,13 +43,8 @@ export const defaultParams: Params = {
   metabolism: 3,
   plantsToWin: 120,
   territory: true,
-  lvMode: 'measured',
-  alpha: 0.5,
-  beta: 0.002,
-  delta: 0.002,
-  gamma: 0.3,
-  grassRegrow: 2,
-  grassEnergy: 40,
+  lvMode: 'manual',
+  alpha: 1.1, beta: 0.04, delta: 0.02, gamma: 0.9,
 };
 
 export const paramSchema: ParamSchema<Params> = {
@@ -71,13 +60,11 @@ export const paramSchema: ParamSchema<Params> = {
   metabolism: { kind: 'range', label: 'Metabolism', min: 0.5, max: 15, step: 0.5, unit: '/s', live: true },
   plantsToWin: { kind: 'range', label: 'Reproduction plants needed', min: 20, max: 400, step: 10, live: true },
   territory: { kind: 'boolean', label: 'Show territory claim', live: true },
-  lvMode: { kind: 'select', label: 'Lotka–Volterra overlay', options: ['off', 'manual', 'measured'], live: true },
-  alpha: { kind: 'range', label: 'LV α (prey growth)', min: 0, max: 2, step: 0.01, live: true, group: 'ODE overlay' },
-  beta: { kind: 'range', label: 'LV β (predation)', min: 0, max: 0.02, step: 0.0005, live: true, group: 'ODE overlay' },
-  delta: { kind: 'range', label: 'LV δ (predator growth)', min: 0, max: 0.02, step: 0.0005, live: true, group: 'ODE overlay' },
-  gamma: { kind: 'range', label: 'LV γ (predator death)', min: 0, max: 2, step: 0.01, live: true, group: 'ODE overlay' },
-  grassRegrow: { kind: 'range', label: 'Grass regrow ticks', min: 10, max: 240, step: 5, live: true, group: 'Grass grid' },
-  grassEnergy: { kind: 'range', label: 'Energy per grass cell', min: 5, max: 160, step: 5, live: true, group: 'Grass grid' },
+  lvMode: { kind: 'select', label: 'Lotka–Volterra parameters', options: ['manual', 'measured'], hint: '“measured” is set by the Calibrate action', live: true },
+  alpha: { kind: 'range', label: 'LV prey growth α', min: 0.1, max: 3, step: 0.05, live: true },
+  beta: { kind: 'range', label: 'LV predation β', min: 0.005, max: 0.2, step: 0.005, live: true },
+  delta: { kind: 'range', label: 'LV conversion δ', min: 0.002, max: 0.2, step: 0.002, live: true },
+  gamma: { kind: 'range', label: 'LV predator death γ', min: 0.1, max: 3, step: 0.05, live: true },
 };
 
 export const WORLD = { w: 800, h: 600 } as const;
@@ -105,13 +92,9 @@ export interface State {
   eaten: [number, number];
   rng: Rng;
   params: Params;
-  grass: Uint8Array;
-  regrow: Uint16Array;
-  lv: LVState | null;
-  integralPrey: number;
-  integralPred: number;
-  integralProduct: number;
-  grassEaten: number;
+  lv: Float64Array; // [prey, predators] mean-field companion
+  odeScratch: { k1: Float64Array; k2: Float64Array; k3: Float64Array; k4: Float64Array; tmp: Float64Array };
+  rate: { preyBorn: number; preyStarved: number; preyEaten: number; predBorn: number; predStarved: number; predEaten: number; sumPrey: number; sumPred: number; sumXY: number; lvResets: number };
 }
 
 export function init(params: Params, rng: Rng): State {
@@ -129,19 +112,15 @@ export function init(params: Params, rng: Rng): State {
     hash: new SpatialHash(WORLD.w, WORLD.h, Math.max(40, params.perception), CAPACITY, false),
     scratch: new Int32Array(CAPACITY),
     regrowCarry: 0,
-    grass: (() => { const g = new Uint8Array(60 * 40); g.fill(1); return g; })(),
-    regrow: new Uint16Array(60 * 40),
-    lv: params.lvMode === 'off' ? null : { prey: params.herbivores, pred: params.predators, time: 0, alpha: params.alpha, beta: params.beta, delta: params.delta, gamma: params.gamma },
-    integralPrey: 0,
-    integralPred: 0,
-    integralProduct: 0,
-    grassEaten: 0,
     time: 0,
     births: [0, 0, 0],
     deaths: [0, 0, 0],
     eaten: [0, 0],
     rng,
     params: { ...params },
+    lv: Float64Array.from([params.herbivores, params.predators]),
+    odeScratch: { k1: new Float64Array(2), k2: new Float64Array(2), k3: new Float64Array(2), k4: new Float64Array(2), tmp: new Float64Array(2) },
+    rate: { preyBorn: 0, preyStarved: 0, preyEaten: 0, predBorn: 0, predStarved: 0, predEaten: 0, sumPrey: 0, sumPred: 0, sumXY: 0, lvResets: 0 },
   };
   for (let i = 0; i < Math.min(params.plants, CAPACITY); i++) spawn(state, PLANT, rng.range(10, WORLD.w - 10), rng.range(10, WORLD.h - 10), 0);
   for (let i = 0; i < Math.min(params.herbivores, CAPACITY - 200); i++) spawn(state, HERB, rng.range(20, WORLD.w - 20), rng.range(20, WORLD.h - 20), 70);
@@ -197,23 +176,6 @@ function claimTerritory(state: State, x: number, y: number, species: number, amo
 
 export function step(state: State, dt: number): State {
   const p = state.params;
-  // Grass grid: regrow eaten cells and consume under grazers.
-  for (let c = 0; c < state.regrow.length; c++) if (state.regrow[c]! > 0) {
-    state.regrow[c] = state.regrow[c]! - 1;
-    if (state.regrow[c]! <= 0) state.grass[c] = 1;
-  }
-  if (state.lv && p.lvMode !== 'off') {
-    if (p.lvMode === 'measured' && state.time > 20 && state.integralPrey > 0 && state.integralPred > 0 && state.integralProduct > 0) {
-      const rates = estimateRates({
-        integralPrey: state.integralPrey, integralPred: state.integralPred, integralProduct: state.integralProduct,
-        preyBorn: state.births[HERB]!, preyEaten: state.eaten[0]!, preyStarved: state.deaths[HERB]!,
-        predBorn: state.births[PRED]!, predStarved: state.deaths[PRED]!,
-        meanPrey: state.counts[HERB]!, meanPred: state.counts[PRED]!,
-      });
-      state.lv.alpha = rates.alpha; state.lv.beta = rates.beta; state.lv.delta = rates.delta; state.lv.gamma = rates.gamma;
-    }
-    lvStep(state.lv, dt);
-  }
   const rng = state.rng;
   for (let i = 0; i < state.claim.length; i++) state.claim[i] = state.claim[i]! * 0.996;
   state.regrowCarry += p.plantRegrowth * dt;
@@ -230,7 +192,9 @@ export function step(state: State, dt: number): State {
 
   const initialN = state.n;
   const scratch = state.scratch;
-  const boost = 1 + state.eaten[0]! * 0 + state.eaten[1]! * 0;
+  state.rate.sumPrey += state.counts[HERB]! * dt;
+  state.rate.sumPred += state.counts[PRED]! * dt;
+  state.rate.sumXY += state.counts[HERB]! * state.counts[PRED]! * dt;
 
   for (let i = 0; i < initialN; i++) {
     if (state.dead[i]) continue;
@@ -266,8 +230,9 @@ export function step(state: State, dt: number): State {
         state.dead[best] = 1;
         state.counts[state.species[best]!] = state.counts[state.species[best]!]! - 1;
         state.deaths[state.species[best]!] = state.deaths[state.species[best]!]! + 1;
-        state.eaten[isPred ? 1 : 0] = state.eaten[isPred ? 1 : 0]! + 1;
-        state.energy[i] = state.energy[i]! + p.energyGain * boost * (isPred ? 1.35 : 1);
+        if (isPred) { state.eaten[1] = state.eaten[1]! + 1; state.rate.predEaten++; }
+        else { state.eaten[0] = state.eaten[0]! + 1; state.rate.preyEaten++; }
+        state.energy[i] = state.energy[i]! + p.energyGain * (isPred ? 1.35 : 1);
       }
     } else {
       // wander deterministically
@@ -285,17 +250,6 @@ export function step(state: State, dt: number): State {
     if (ny < 4) { ny = 4; state.vy[i] = Math.abs(state.vy[i]!); }
     if (ny > WORLD.h - 4) { ny = WORLD.h - 4; state.vy[i] = -Math.abs(state.vy[i]!); }
     state.x[i] = nx; state.y[i] = ny;
-    if (species === HERB) {
-      const gx = Math.min(59, Math.max(0, Math.floor((nx / WORLD.w) * 60)));
-      const gy = Math.min(39, Math.max(0, Math.floor((ny / WORLD.h) * 40)));
-      const cell = gy * 60 + gx;
-      if (state.grass[cell] === 1) {
-        state.grass[cell] = 0;
-        state.regrow[cell] = Math.max(10, Math.round(p.grassRegrow));
-        state.energy[i] = state.energy[i]! + p.grassEnergy;
-        state.grassEaten++;
-      }
-    }
     state.energy[i] = state.energy[i]! - p.metabolism * dt;
     claimTerritory(state, nx, ny, species, dt * (isPred ? 0.05 : 0.02));
 
@@ -303,26 +257,71 @@ export function step(state: State, dt: number): State {
       state.dead[i] = 1;
       state.counts[species] = state.counts[species]! - 1;
       state.deaths[species] = state.deaths[species]! + 1;
+      if (species === HERB) state.rate.preyStarved++; else if (species === PRED) state.rate.predStarved++;
       continue;
     }
     const plantOk = state.counts[PLANT]! >= p.plantsToWin;
     if (!isPred && state.energy[i]! >= p.reproduceAt && plantOk && state.n < CAPACITY - 4) {
       state.energy[i] = state.energy[i]! / 2;
       const i2 = spawn(state, HERB, nx + rng.range(-8, 8), ny + rng.range(-8, 8), state.energy[i]!);
-      if (i2 >= 0) state.births[HERB] = state.births[HERB]! + 1;
+      if (i2 >= 0) { state.births[HERB] = state.births[HERB]! + 1; state.rate.preyBorn++; }
     } else if (isPred && state.energy[i]! >= p.reproduceAt * 1.4 && state.counts[HERB]! > 30 && state.n < CAPACITY - 4) {
       state.energy[i] = state.energy[i]! / 2;
       const i2 = spawn(state, PRED, nx + rng.range(-8, 8), ny + rng.range(-8, 8), state.energy[i]!);
-      if (i2 >= 0) state.births[PRED] = state.births[PRED]! + 1;
+      if (i2 >= 0) { state.births[PRED] = state.births[PRED]! + 1; state.rate.predBorn++; }
     }
   }
   compact(state);
-  const prey = state.counts[HERB]!;
-  const pred = state.counts[PRED]!;
-  state.integralPrey += prey * dt;
-  state.integralPred += pred * dt;
-  state.integralProduct += prey * pred * dt;
+  // mean-field Lotka–Volterra companion, advanced with the same dt (RK4).
+  const p2 = state.params;
+  rk4((_t, y, out) => {
+    const prey = Math.max(0, y[0]!);
+    const pred = Math.max(0, y[1]!);
+    out[0] = p2.alpha * prey - p2.beta * prey * pred;
+    out[1] = p2.delta * prey * pred - p2.gamma * pred;
+  }, state.time, state.lv, dt, state.odeScratch);
+  state.lv[0] = Math.max(0, state.lv[0]!);
+  state.lv[1] = Math.max(0, state.lv[1]!);
   state.time += dt;
+  return state;
+}
+
+/** Estimate per-capita rates from trailing counters; resets the ODE to counts. */
+export function calibrateLv(state: State): State {
+  const r = state.rate;
+  const prey = Math.max(1, state.counts[HERB]!);
+  const pred = Math.max(1, state.counts[PRED]!);
+  const sumPrey = Math.max(1e-6, r.sumPrey);
+  const sumPred = Math.max(1e-6, r.sumPred);
+  const sumXY = Math.max(1e-6, r.sumXY);
+  state.params = {
+    ...state.params,
+    lvMode: 'measured',
+    alpha: Math.max(0.05, (r.preyBorn - r.preyStarved) / sumPrey),
+    beta: Math.max(0.0005, r.preyEaten / Math.max(1e-6, sumXY / Math.max(1, prey))),
+    delta: Math.max(0.0005, r.predBorn / Math.max(1e-6, sumXY / Math.max(1, pred))),
+    gamma: Math.max(0.05, r.predStarved / sumPred),
+  };
+  state.lv[0] = state.counts[HERB]!;
+  state.lv[1] = state.counts[PRED]!;
+  r.lvResets++;
+  r.sumPrey = 0; r.sumPred = 0; r.sumXY = 0;
+  r.preyBorn = 0; r.preyStarved = 0; r.preyEaten = 0;
+  r.predBorn = 0; r.predStarved = 0; r.predEaten = 0;
+  return state;
+}
+
+export function drought(state: State, x = 400, y = 300, radius = 160): State {
+  for (let i = 0; i < state.n; i++) {
+    if (state.species[i] !== PLANT) continue;
+    if ((state.x[i]! - x) ** 2 + (state.y[i]! - y) ** 2 <= radius * radius) { state.dead[i] = 1; }
+  }
+  compact(state);
+  return state;
+}
+
+export function releasePredators(state: State, count = 12): State {
+  for (let i = 0; i < count; i++) spawn(state, PRED, state.rng.range(40, WORLD.w - 40), state.rng.range(40, WORLD.h - 40), 110);
   return state;
 }
 
@@ -378,61 +377,48 @@ export function diagnosticsExtras(state: State): Record<string, number> {
 }
 
 
-/** Contract v6 actions: calibrate the ODE, drought a patch, release predators. */
-export function onAction(state: State, id: string): State {
-  const rng = state.rng;
-  if (id === 'calibrate') {
-    if (state.lv) {
-      state.lv.prey = state.counts[HERB]!;
-      state.lv.pred = state.counts[PRED]!;
-      if (state.integralPrey > 0 && state.integralPred > 0 && state.integralProduct > 0) {
-        const rates = estimateRates({
-          integralPrey: state.integralPrey, integralPred: state.integralPred, integralProduct: state.integralProduct,
-          preyBorn: state.births[HERB]!, preyEaten: state.eaten[0]!, preyStarved: state.deaths[HERB]!,
-          predBorn: state.births[PRED]!, predStarved: state.deaths[PRED]!,
-          meanPrey: state.counts[HERB]!, meanPred: state.counts[PRED]!,
-        });
-        state.lv.alpha = rates.alpha; state.lv.beta = rates.beta; state.lv.delta = rates.delta; state.lv.gamma = rates.gamma;
-      }
-    }
-  } else if (id === 'drought') {
-    for (let c = 0; c < state.grass.length; c++) { state.grass[c] = 0; state.regrow[c] = Math.max(60, Math.round(state.params.grassRegrow * 1.5)); }
-  } else if (id === 'release-predators') {
-    for (let k = 0; k < 12; k++) spawn(state, PRED, rng.range(40, WORLD.w - 40), rng.range(40, WORLD.h - 40), 120);
-  }
-  return state;
+export function meanEnergy(state: State, species: number): number {
+  let total = 0; let count = 0;
+  for (let i = 0; i < state.n; i++) if (state.species[i] === species) { total += state.energy[i]!; count++; }
+  return count ? total / count : NaN;
 }
 
-export const ecosystemBatch: BatchSpec<Params> = {
-  metrics: [
-    { id: 'extinctPrey', label: 'Prey extinction', kind: 'indicator' },
-    { id: 'extinctPred', label: 'Predator extinction', kind: 'indicator' },
-    { id: 'meanPrey', label: 'Mean prey', kind: 'scalar' },
-    { id: 'meanPred', label: 'Mean predators', kind: 'scalar' },
-    { id: 'oscillates', label: 'Oscillates', kind: 'indicator' },
-  ],
-  series: [{ id: 'populations', label: 'populations', dt: 2, n: 30 }],
-  runOne(params, seed) {
-    const state = init({ ...params, lvMode: 'off' }, createRng(seed));
-    const series: number[] = [];
-    for (let i = 0; i < 900; i++) {
-      step(state, 1 / 60);
-      if (i % 60 === 0) series.push(state.counts[HERB]!);
-    }
-    const extinctPrey = state.counts[HERB] === 0 ? 1 : 0;
-    const extinctPred = state.counts[PRED] === 0 ? 1 : 0;
-    const prey = state.counts[HERB]!;
-    const pred = state.counts[PRED]!;
-    // Oscillation = at least two local predator maxima across the recorded series.
-    let peaks = 0;
-    for (let i = 1; i < series.length - 1; i++) if (series[i]! > series[i - 1]! && series[i]! >= series[i + 1]!) peaks++;
-    return {
-      values: Float64Array.from([extinctPrey, extinctPred, prey, pred, peaks >= 2 ? 1 : 0]),
-      series: [Float32Array.from(series)],
-    };
-  },
-  sweep: { key: 'plantRegrowth', label: 'regrowth', values: [15, 30, 45, 80, 120] },
-  defaults: { runs: 20, maxRuns: 100 },
-};
+export function totalEnergy(state: State): number {
+  let total = 0;
+  for (let i = 0; i < state.n; i++) total += state.energy[i]!;
+  return total;
+}
 
-export { lvFirstIntegral, lvEquilibrium };
+export function runOneEcosystem(p: Params, seed: number, steps = 60 * 45): { extinctPrey: number; extinctPred: number; meanPrey: number; meanPred: number; predPeaks: number; oscillates: number; seriesPrey: Float32Array; seriesPred: Float32Array } {
+  const state = init(p, createRng(seed));
+  const sampleEvery = 60;
+  const n = Math.floor(steps / sampleEvery);
+  const sPrey = new Float32Array(n);
+  const sPred = new Float32Array(n);
+  let predPeaks = 0; let lastPred = state.counts[PRED]!; let rising = false;
+  let sumPrey = 0; let sumPred = 0;
+  for (let i = 0; i < steps; i++) {
+    step(state, 1 / 60);
+    sumPrey += state.counts[HERB]!; sumPred += state.counts[PRED]!;
+    if (i % sampleEvery === 0) {
+      const k = Math.floor(i / sampleEvery);
+      if (k < n) { sPrey[k] = state.counts[HERB]!; sPred[k] = state.counts[PRED]!; }
+    }
+    const pred = state.counts[PRED]!;
+    if (pred > lastPred) rising = true;
+    else if (rising && pred < lastPred) { predPeaks++; rising = false; }
+    lastPred = pred;
+  }
+  return {
+    extinctPrey: state.counts[HERB] === 0 ? 1 : 0,
+    extinctPred: state.counts[PRED] === 0 ? 1 : 0,
+    meanPrey: sumPrey / steps,
+    meanPred: sumPred / steps,
+    predPeaks,
+    oscillates: predPeaks >= 2 ? 1 : 0,
+    seriesPrey: sPrey,
+    seriesPred: sPred,
+  };
+}
+
+export { createRng, deriveSeed };

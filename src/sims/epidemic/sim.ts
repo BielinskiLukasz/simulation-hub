@@ -363,7 +363,7 @@ export const epidemicBatch: BatchSpec<Params> = {
     { id: 'random', label: 'Random vaccination', overrides: { vaccination: 'random' } },
     { id: 'degree', label: 'Degree-targeted', overrides: { vaccination: 'degree' } },
   ],
-  sweep: { key: 'vaccinated', label: '% vaccinated', values: [0, 5, 10, 15, 20, 30, 40] },
+  sweep: { key: 'vaccinated', label: '% vaccinated', values: [0, 10, 20, 30, 40] },
   conditional: { id: 'majorOutbreak', on: 'majorOutbreak' },
-  defaults: { runs: 30, maxRuns: 200 },
+  defaults: { runs: 20, maxRuns: 200 },
 };

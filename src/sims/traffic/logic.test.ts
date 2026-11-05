@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createRng } from '../../core/rng';
 import { Runner } from '../../core/runner';
 import { assertFrameRateIndependence, hashFloat64 } from '../../core/testing';
-import { defaultParams, diagnostics, init, jamTravelDirection, step, type Params } from './logic';
+import { defaultParams, diagnostics, init, jamTravelDirection, signalIsGreen, step, type Params } from './logic';
 import sim from './index';
 
 function run(over: Partial<Params>, seed: number, steps: number) {
@@ -43,6 +43,22 @@ describe('traffic IDM', () => {
     expect(dirs.length).toBeGreaterThan(20);
     expect(backwards / dirs.length).toBeGreaterThan(0.7);
     expect(dirs.reduce((a, b) => a + b, 0) / dirs.length).toBeLessThan(-2);
+  });
+
+  it('traffic light: periodic phase and vehicles queue without crossing on red', () => {
+    expect(signalIsGreen(0, 30, 0.5)).toBe(true);
+    expect(signalIsGreen(20, 30, 0.5)).toBe(false);
+    expect(signalIsGreen(60.1, 30, 0.5)).toBe(true);
+    const red = init({ ...defaultParams, signal: true, signalGreen: 0.1, signalCycle: 120, signalAt: 0.5, polarize: false }, createRng(2));
+    for (let i = 0; i < 1500; i++) step(red, 1 / 60);
+    const stop = red.params.signalAt * red.ring;
+    // everyone should be queued before the stop line (within the upstream half)
+    for (let i = 0; i < red.n; i++) {
+      const behind = ((stop - red.pos[i]! + red.ring) % red.ring);
+      expect(behind).toBeGreaterThan(0.2);
+    }
+    const d = diagnostics(red);
+    expect(d.meanSpeed).toBeLessThan(2);
   });
 
   it('frame-rate independence for the ring', () => {

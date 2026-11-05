@@ -10,6 +10,9 @@
   P(major event) with conditional means, and every result header states N and the base seed.
 - Event sims keep compiled data in `shared` (never snapshotted); the epidemic graph and order-book
   config live there.
+- Phase-6 completion state: the platform, epidemic, ecosystem upgrade, order-book engine/agents
+  and the traffic ring (with a fixed-cycle signal) are implemented and tested. Traffic multi-lane
+  MOBIL, signalized networks and the road editor are still open, as is live compare for event sims.
 - v7 candidates: live compare for event sims (two Players on a shared time axis), generalized
   presets/scenarios, WebGL overlays, supply-chain/factory models reusing the batch runner.
 

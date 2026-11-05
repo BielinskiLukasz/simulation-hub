@@ -11,6 +11,25 @@
 - **Traffic (realtime):** IDM ring road, Bayesian-free deterministic perturbations, phantom jam verified with backwards wave velocity, space-time heatmap and fundamental-diagram batch.
 - **Compare Mode** (Phase 5) remains live for realtime sims; the stale hub teaser was removed.
 
+### Phase-6 completion pass
+
+- **Ecosystem upgraded to Phase-6 level:** Lotka–Volterra RK4 companion in state,
+  measured-rate **Calibrate** action, **Drought** and **Release predators**
+  actions, metrics dashboard (populations + LV overlay, territory, energies),
+  phase-portrait chart and a batch runner with oscillation/extinction
+  indicators; 5 new tests (LV determinism/equilibrium, calibration/actions,
+  ledger, batch output).
+- **Order book:** fuzz suite with invariants after every event, seek-back
+  branching test, ledger test and **mutation checks** (crossed book, cash leak)
+  proving the invariants can fail; fixed a real bug where initial wake timers
+  were scheduled on a no-op shim, leaving the market event queue empty.
+- **Traffic:** optional fixed-cycle traffic light with a stop line; vehicles
+  never cross on red (tested), signal rendering, plus periodicity tests.
+- **Docs:** per-sim READMEs for epidemic, order book and traffic; STATS.md;
+  honest known-gap lists (traffic network/editor, order-book stretch extras,
+  live event compare).
+- Verification: **305 tests**, lint/typecheck clean, build green.
+
 ## Phase 5 addendum — Compare Mode shipped & Ecosystem simulator
 
 - **Compare Mode promoted from roadmap:** trace sims (Pathfinding, Cache Hierarchy) already had in-page compare; Phase 5 added realtime lockstep compare (`RunnerGroup`, mirrored input, linked cameras, `cmp`/`b.*` URLs) to N-Body, Cloth and now Ecosystem. The stale hub teaser was removed.

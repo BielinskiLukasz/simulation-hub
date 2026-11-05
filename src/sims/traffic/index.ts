@@ -1,14 +1,12 @@
 import type { BatchSpec, RealtimeSimulation } from '../../core/types';
 import { createRng } from '../../core/rng';
-import { lightAt } from './network';
 import { meta } from './meta';
 import {
-  applyParams, CELLS, defaultParams, diagnostics, HISTORY, init, jamTravelDirection, onPointer, paramSchema, step,
+  applyParams, CELLS, defaultParams, diagnostics, HISTORY, init, jamTravelDirection, onPointer, paramSchema, signalIsGreen, step,
   type Params, type State,
 } from './logic';
 
 function render(state: State, rc: import('../../core/types').RenderContext): void {
-  if (state.network) { renderNetwork(state, rc); return; }
   const { ctx, width, height, theme } = rc;
   const dark = theme === 'dark';
   ctx.fillStyle = dark ? '#0a0f16' : '#f8fafc';
@@ -40,57 +38,24 @@ function render(state: State, rc: import('../../core/types').RenderContext): voi
     ctx.fillStyle = `hsl(${t * 120} 75% 52%)`;
     ctx.beginPath(); ctx.arc(x, y, 3.2, 0, Math.PI * 2); ctx.fill();
   }
+  if (state.params.signal) {
+    const ang = ((state.params.signalAt * state.ring) / state.ring) * Math.PI * 2;
+    const sx = cx + Math.cos(ang) * r; const sy = cy + Math.sin(ang) * r;
+    const green = signalIsGreen(state.time, state.params.signalCycle, state.params.signalGreen);
+    ctx.strokeStyle = green ? '#22c55e' : '#ef4444';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(sx, sy); ctx.stroke();
+    ctx.fillStyle = green ? '#22c55e' : '#ef4444';
+    ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = dark ? '#94a3b8' : '#64748b';
+    ctx.font = '9px "JetBrains Mono", monospace';
+    ctx.fillText(green ? 'green' : 'red', sx + 8, sy - 6);
+  }
   const d = diagnostics(state);
   ctx.fillStyle = dark ? '#e2e8f0' : '#1e293b';
   ctx.font = '11px "JetBrains Mono", monospace';
   const dir = jamTravelDirection(state);
   ctx.fillText(`n ${state.n} · ρ ${d.density.toFixed(0)} veh/km · flow ${d.flow.toFixed(0)} veh/h · v̄ ${(d.meanSpeed * 3.6).toFixed(0)} km/h · σ ${d.speedSd.toFixed(2)} · vmin ${(d.minSpeed * 3.6).toFixed(0)} km/h · jam wave ${Number.isFinite(dir) ? dir.toFixed(1) : '—'} m/s`, 16, height - 10);
-}
-
-function renderNetwork(state: State, rc: import('../../core/types').RenderContext): void {
-  const { ctx, width, height, theme } = rc;
-  const dark = theme === 'dark';
-  ctx.fillStyle = dark ? '#0a0f16' : '#f8fafc';
-  ctx.fillRect(0, 0, width, height);
-  const net = state.network!;
-  const xs = net.nodes.map((n) => n.x); const ys = net.nodes.map((n) => n.y);
-  const minX = Math.min(...xs) - 60, maxX = Math.max(...xs) + 60;
-  const minY = Math.min(...ys) - 60, maxY = Math.max(...ys) + 60;
-  const sc = Math.min(width / (maxX - minX), height / (maxY - minY));
-  const X = (x: number) => (x - minX) * sc;
-  const Y = (y: number) => (y - minY) * sc;
-  for (const r of net.roads) {
-    const a = net.nodes.find((n) => n.id === r.from)!; const b = net.nodes.find((n) => n.id === r.to)!;
-    const light = lightAt(net, r.id);
-    ctx.strokeStyle = light.red ? 'rgba(244,63,94,0.45)' : light.yellow ? 'rgba(245,158,11,0.45)' : 'rgba(148,163,184,0.4)';
-    ctx.lineWidth = r.lanes * 4;
-    ctx.beginPath(); ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(b.x), Y(b.y)); ctx.stroke();
-  }
-  for (let i = 0; i < net.n; i++) {
-    if (!net.alive[i]) continue;
-    const r = net.roads[net.road[i]!]!;
-    const a = net.nodes.find((n) => n.id === r.from)!; const b = net.nodes.find((n) => n.id === r.to)!;
-    const t = Math.min(1, net.pos[i]! / Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)));
-    const x = a.x + (b.x - a.x) * t; const y = a.y + (b.y - a.y) * t;
-    const tSpeed = Math.min(1, net.vel[i]! / Math.max(1, r.limit));
-    ctx.fillStyle = `hsl(${tSpeed * 120} 75% 52%)`;
-    ctx.beginPath(); ctx.arc(X(x), Y(y), 3.2, 0, Math.PI * 2); ctx.fill();
-  }
-  for (const node of net.nodes) {
-    ctx.fillStyle = node.kind === 'source' ? '#38bdf8' : node.kind === 'sink' ? '#a78bfa' : '#f59e0b';
-    ctx.beginPath(); ctx.arc(X(node.x), Y(node.y), 5, 0, Math.PI * 2); ctx.fill();
-    if (net.lights.has(node.id)) {
-      const incoming = net.roads.find((r) => r.to === node.id);
-      if (incoming) {
-        const phase = lightAt(net, incoming.id);
-        ctx.fillStyle = phase.red ? '#ef4444' : phase.yellow ? '#f59e0b' : '#22c55e';
-        ctx.beginPath(); ctx.arc(X(node.x) + 9, Y(node.y) - 9, 4, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-  }
-  ctx.fillStyle = dark ? '#e2e8f0' : '#1e293b';
-  ctx.font = '11px "JetBrains Mono", monospace';
-  ctx.fillText(`live ${Array.from(net.alive).reduce((a, b) => a + b, 0)} · spawned ${net.spawned} · removed ${net.removed} · overlaps ${net.collisions} · throughput ${net.throughput}`, 16, height - 10);
 }
 
 const batch: BatchSpec<Params> = {

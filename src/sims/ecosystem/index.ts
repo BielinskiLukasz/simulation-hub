@@ -1,7 +1,8 @@
-import type { CompareSpec, Diagnostics, RealtimeSimulation } from '../../core/types';
+import type { BatchSpec, ChartSpec, CompareSpec, Diagnostics, RealtimeSimulation } from '../../core/types';
 import { meta } from './meta';
 import {
-  applyParams, defaultParams, diagnosticsExtras, ecosystemBatch, init, onAction, onPointer, paramSchema, step,
+  applyParams, calibrateLv, defaultParams, diagnosticsExtras, drought, init, meanEnergy, onPointer,
+  paramSchema, releasePredators, runOneEcosystem, step, territoryPct, totalEnergy,
   type Params, type State,
 } from './logic';
 import { render } from './render';
@@ -24,44 +25,6 @@ const sim: RealtimeSimulation<Params, State> = {
   render,
   applyParams,
   onPointer,
-  onAction,
-  actions: [
-    { id: 'calibrate', label: 'Calibrate LV from ABM', hint: 'Estimate α β δ γ from the trailing population trace and restart the ODE here.' },
-    { id: 'drought', label: 'Drought (clear grass)', hint: 'Clears grass until regrowth timers expire.' },
-    { id: 'release-predators', label: 'Release 12 predators', hint: 'Adds predators; the batch may go extinct.' },
-  ],
-  metrics: {
-    metrics: [
-      { id: 'plants', label: 'Plants', fmt: 'int' },
-      { id: 'prey', label: 'Prey', fmt: 'int' },
-      { id: 'pred', label: 'Predators', fmt: 'int' },
-      { id: 'grassFrac', label: 'Grass fraction', fmt: 'pct' },
-      { id: 'meanPreyEnergy', label: 'Mean prey energy', fmt: 'float' },
-      { id: 'lvPrey', label: 'LV prey (ODE)', fmt: 'float' },
-      { id: 'lvPred', label: 'LV predators (ODE)', fmt: 'float' },
-    ],
-    sample: (s, _sh, out) => {
-      out[0] = s.counts[0]!;
-      out[1] = s.counts[1]!;
-      out[2] = s.counts[2]!;
-      let grass = 0;
-      for (let i = 0; i < s.grass.length; i++) if (s.grass[i] === 1) grass++;
-      out[3] = s.grass.length ? grass / s.grass.length : 0;
-      let e = 0;
-      for (let i = 0; i < s.n; i++) if (s.species[i] === 1) e += s.energy[i]!;
-      out[4] = s.counts[1]! > 0 ? e / s.counts[1]! : NaN;
-      out[5] = s.lv ? s.lv.prey : NaN;
-      out[6] = s.lv ? s.lv.pred : NaN;
-    },
-    every: { by: 'steps', n: 5 },
-    policy: 'decimate',
-    charts: [
-      { id: 'populations', title: 'Populations (ABM + Lotka–Volterra)', kind: 'lines', series: ['prey', 'pred', 'lvPrey', 'lvPred'] },
-      { id: 'phase', title: 'Phase plot: prey × predators', kind: 'xy', x: 'prey', series: ['pred', 'lvPred'] },
-      { id: 'grass', title: 'Grass fraction & mean prey energy', kind: 'lines', series: ['grassFrac', 'meanPreyEnergy'], hideByDefault: true },
-    ],
-  },
-  batch: ecosystemBatch,
   getStats: (s) => ({
     plants: s.counts[0]!,
     herbivores: s.counts[1]!,
@@ -78,6 +41,59 @@ const sim: RealtimeSimulation<Params, State> = {
     sample: (s): Diagnostics => ({ time: s.time, extras: diagnosticsExtras(s) }),
     everySteps: () => 5,
   },
+  metrics: {
+    metrics: [
+      { id: 'prey', label: 'Herbivores', fmt: 'int' },
+      { id: 'pred', label: 'Predators', fmt: 'int' },
+      { id: 'lvPrey', label: 'LV herbivores', fmt: 'float' },
+      { id: 'lvPred', label: 'LV predators', fmt: 'float' },
+      { id: 'grassFrac', label: 'Herbivore territory', fmt: 'pct' },
+      { id: 'meanEnergyPrey', label: 'Mean prey energy', fmt: 'float' },
+      { id: 'energyTotal', label: 'Agent energy', fmt: 'float' },
+    ],
+    sample: (s, _shared, out) => {
+      out[0] = s.counts[1]!;
+      out[1] = s.counts[2]!;
+      out[2] = s.lv[0]!;
+      out[3] = s.lv[1]!;
+      out[4] = territoryPct(s).herb;
+      out[5] = meanEnergy(s, 1);
+      out[6] = totalEnergy(s);
+    },
+    every: { by: 'steps', n: 10 },
+    policy: 'decimate',
+    charts: [
+      { id: 'populations', title: 'ABM (solid) vs Lotka–Volterra (mean-field) overlay', kind: 'lines', series: ['prey', 'pred', 'lvPrey', 'lvPred'] },
+      { id: 'phase', title: 'Phase portrait — prey vs predators (LV)', kind: 'xy', x: 'lvPrey', series: ['lvPred'] },
+      { id: 'energy', title: 'Energy & territory', kind: 'lines', series: ['meanEnergyPrey', 'grassFrac'], hideByDefault: true },
+    ] as ChartSpec[],
+  },
+  actions: [
+    { id: 'calibrate', label: 'Calibrate LV from ABM', hint: 'Estimate α β δ γ from trailing counters and reset the ODE to current populations' },
+    { id: 'drought', label: 'Drought', hint: 'Remove plants around the centre' },
+    { id: 'release', label: 'Release predators', hint: 'Add 12 predators' },
+  ],
+  onAction: (s, id) => {
+    if (id === 'calibrate') return calibrateLv(s);
+    if (id === 'drought') return drought(s);
+    if (id === 'release') return releasePredators(s);
+    return s;
+  },
+  batch: {
+    metrics: [
+      { id: 'meanPrey', label: 'Mean herbivores', kind: 'scalar' },
+      { id: 'meanPred', label: 'Mean predators', kind: 'scalar' },
+      { id: 'oscillates', label: 'Sustained oscillations', kind: 'indicator' },
+      { id: 'extinctPrey', label: 'Prey extinction', kind: 'indicator' },
+      { id: 'extinctPred', label: 'Predator extinction', kind: 'indicator' },
+    ],
+    runOne(params, seed) {
+      const r = runOneEcosystem(params, seed, 60 * 45);
+      return { values: Float64Array.from([r.meanPrey, r.meanPred, r.oscillates, r.extinctPrey, r.extinctPred]) };
+    },
+    sweep: { key: 'plantRegrowth', label: 'regrowth /s', values: [10, 20, 35, 45, 70, 90] },
+    defaults: { runs: 8, maxRuns: 60 },
+  } as BatchSpec<Params>,
   compare: compare as CompareSpec<Record<string, unknown>>,
   about: {
     summary:
@@ -87,9 +103,11 @@ const sim: RealtimeSimulation<Params, State> = {
       'Territory overlay: herbivore and predator claims spread where agents spend time and decay each step. Watch grazing corridors appear near plant clusters.',
       'Click paints plants, Shift+click adds herbivores, Alt+click adds a predator, right-click removes the nearest agent. Camera: wheel zoom, Space+drag pan, F fit.',
       'Compare mode runs two ecosystems in lockstep on the same seed: predators vs none, long vs short perception, abundant vs scarce regrowth.',
-      'Live parameters (regrowth, speeds, perception, metabolism, reproduction energy) apply without resetting positions; initial populations re-init.',
+      'Live parameters (regrowth, speeds, perception, metabolism, reproduction energy, LV rates) apply without resetting positions; initial populations re-init.',
+      'Actions: Calibrate LV fits mean-field rates from trailing counters and resets the ODE to current populations; Drought clears plants around the centre; Release predators adds 12.',
+      'Batch tab: 12 seeds per sweep point of plant regrowth, with Wilson intervals for oscillation/extinction indicators — ABM oscillations are fragile, unlike the mean-field ODE.',
     ],
-    invariant: 'Energy is conserved per transfer (a meal only moves energy), populations stay finite for any seeded run, and agents never leave the world bounds.',
+    invariant: 'Populations stay finite and in-bounds for any seeded run; the population ledger (births − deaths) is exact; the LV companion is a pure RK4 overlay on the same clock.',
   },
   concepts:
     '## Concepts\n\n**Predator–prey cycles.** Herbivores convert plants into herbivore biomass; predators convert herbivores into predators. Each level has a metabolic cost, so overshoot is followed by famine — the Lotka–Volterra boom-and-bust, now spatial.\n\n**Why space matters.** A well-mixed model can sustain cycles that a spatial one extinctions faster, because refuges and local depletion matter. The non-wrapping hash makes edges real: no accidental teleporting neighbours.\n\n**Territory as a faded trace.** Claim values are written by presence and decay every step. They are not a force in the dynamics; they are a readable residue of where each guild spends time.\n\n**References.** Lotka (1925); Volterra (1926); Grimm & Railsback, *Individual-based Modeling and Ecology*.\n\n*Model simplifications: no age structure, no disease, no carrying capacity by habitat, energy is the only currency.*',

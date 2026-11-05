@@ -258,7 +258,7 @@ export const marketSim: EventSimulation<Params, State, MarketEvent, MarketAction
       place(shim, INSTITUTIONAL, SIDE_SELL, TICK0 + i, 20);
       place(shim, INSTITUTIONAL, SIDE_BUY, TICK0 - i, 20);
     }
-    for (let i = 0; i < agentCount; i++) scheduleWake(shim, i);
+    for (let i = 0; i < agentCount; i++) ctx.schedule(expMs(ctx.rng, agents[i]!.wakeRate), { t: 'wake', agent: i });
     if (preset === 'flash-crash') ctx.schedule(2500, { t: 'shock' });
     return state;
   },
@@ -374,8 +374,8 @@ export const marketBatch: BatchSpec<Params> = {
     { id: 'calm', label: 'Calm', overrides: { preset: 'calm', mmCount: 6 } },
     { id: 'flash', label: 'Flash-crash mix', overrides: { preset: 'flash-crash', mmCount: 2 } },
   ],
-  sweep: { key: 'mmCount', label: 'market makers', values: [0, 1, 2, 3, 4, 6, 8] },
-  defaults: { runs: 20, maxRuns: 100 },
+  sweep: { key: 'mmCount', label: 'market makers', values: [0, 1, 2, 4, 6] },
+  defaults: { runs: 10, maxRuns: 100 },
 };
 
 export { cancelOrder, createRng };

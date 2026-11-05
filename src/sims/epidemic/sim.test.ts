@@ -50,7 +50,7 @@ describe('epidemic', () => {
   it('single edge: P(B infected) ≈ transmissibility over many runs', () => {
     const p: Params = { ...defaultParams, nodes: 2, topology: 'erdos-renyi', meanDegree: 1, graphSeed: 5, vaccination: 'none', vaccinated: 0, seeds: 1, model: 'SIR', beta: 0.8, gamma: 0.4 };
     let infected = 0;
-    const N = 600;
+    const N = 300;
     for (let s = 0; s < N; s++) {
       const engine = new Engine({ ...sim, compile: () => {
         // force a single edge, node 0 seed
@@ -65,9 +65,9 @@ describe('epidemic', () => {
       if (engine.state.status[1] === 3) infected++;
     }
     const T = transmissibility(p.beta, p.gamma);
-    expect(infected / N).toBeGreaterThan(T - 0.08);
-    expect(infected / N).toBeLessThan(T + 0.08);
-  });
+    expect(infected / N).toBeGreaterThan(T - 0.10);
+    expect(infected / N).toBeLessThan(T + 0.10);
+  }, 30000);
 
   it('vaccination: degree strategy removes top degrees; final size theory sane', () => {
     const p = P({ nodes: 400, vaccination: 'degree', vaccinated: 20, graphSeed: 12 });

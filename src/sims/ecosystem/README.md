@@ -24,3 +24,21 @@ decaying territory overlay.
 Determinism, boundedness, starvation, meal-energy transfer, population cap,
 predation pressure, territory sanity, non-wrapping hash equivalence and
 pointer/live-param behaviour are covered in `logic.test.ts`.
+
+## Phase-6 upgrade
+
+- **Lotka–Volterra overlay:** a mean-field companion `(x, y)` advanced with RK4
+  on the same clock as the ABM; metrics `lvPrey`/`lvPred`; phase portrait chart.
+- **Calibrate LV from ABM** action estimates α β δ γ from trailing counters
+  (births, starvation, predation, time integrals) and resets the ODE to the
+  current populations. **Drought** removes plants around the centre;
+  **Release predators** adds 12.
+- **Metrics dashboard:** herbivores, predators, LV overlay, territory fraction,
+  mean prey energy and total agent energy.
+- **Batch:** seeds per sweep point of plant regrowth; metrics include mean
+  populations, predator-peak count, sustained-oscillation and extinction
+  indicators with Wilson intervals.
+
+Tests cover LV determinism/boundedness, stationary equilibrium (γ/δ, α/β),
+calibration reset and action effects, population ledger exactness and headless
+batch output.

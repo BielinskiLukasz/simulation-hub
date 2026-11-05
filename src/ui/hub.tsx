@@ -23,10 +23,12 @@ const THUMB_BALLS = [
   { c: '#fb7185', s: 22, l: '80%', d: '.45s', dur: '1.55s', drop: '88px' },
 ];
 
+// Compare Mode is no longer a teaser: trace sims (Pathfinding, Cache) have
+// in-page compare, and realtime sims (N-Body, Cloth, Ecosystem) have a
+// lockstep Compare button in their toolbar. Only genuinely future work stays.
 const ROADMAP = [
-  { title: 'Compare Mode', cat: 'Platform', desc: 'Two seeds / two param sets, side by side, diffed stats.', icon: '◧', phase: 'Phase 4' },
-  { title: 'Ecosystem & Spatial Agents', cat: 'Emergent', desc: 'Predator-prey food web, energy transfer & territorial emergence.', icon: '🌿', phase: 'Phase 5' },
-  { title: 'Perf Recorder & Dashboards', cat: 'Platform', desc: 'Time-series metrics from getStats, exportable multi-chart telemetry.', icon: '∿', phase: 'Phase 6' },
+  { title: 'Perf Recorder & Dashboards', cat: 'Platform', desc: 'Generalized time-series recorder, multi-chart dashboards, seed sweeps.', icon: '∿', phase: 'Phase 6' },
+  { title: 'Traffic & Road Editor', cat: 'Emergent', desc: 'Agent worlds at scale, patch-based road editing, junction routing.', icon: '⇄', phase: 'Phase 6' },
 ];
 
 export function Hub({ entries, onRandom }: { entries: SimEntry[]; onRandom: () => void }) {
@@ -85,7 +87,7 @@ export function Hub({ entries, onRandom }: { entries: SimEntry[]; onRandom: () =
         {/* proof strip */}
         <div className="mx-auto mt-8 grid max-w-3xl grid-cols-2 gap-2 sm:grid-cols-4">
           {[
-            ['17', 'live simulations'], ['4 kinds', 'realtime, batch, event, trace'], ['Time-Travel', 'scrub, seek & branch'], ['247', 'unit tests green'],
+            ['18', 'live simulations'], ['4 kinds', 'realtime, batch, event, trace'], ['Time-Travel', 'scrub, seek & branch'], ['256', 'unit tests green'],
           ].map(([v, l]) => (
             <div key={l} className="rounded-2xl border border-slate-200 bg-white px-3 py-3 dark:border-white/10 dark:bg-white/[.04]">
               <div className="text-xl font-black text-slate-900 dark:text-white">{v}</div>
@@ -383,6 +385,22 @@ function SimCard({ entry }: { entry: SimEntry }) {
             <circle cx="228" cy="68" r="11" fill="#facc15" /><text x="228" y="72" textAnchor="middle" fontSize="9" fontWeight="900" fill="#713f12">S</text>
             <rect x="30" y="36" width="32" height="16" rx="4" fill="#1e293b" stroke="#94a3b8" /><text x="46" y="47" textAnchor="middle" fontSize="9" fill="#e2e8f0">A=1</text>
             <rect x="30" y="84" width="32" height="16" rx="4" fill="#1e293b" stroke="#94a3b8" /><text x="46" y="95" textAnchor="middle" fontSize="9" fill="#e2e8f0">B=0</text>
+          </svg>
+        )}
+        {m.thumbnail === 'ecosystem' && (
+          <svg viewBox="0 0 300 144" className="absolute inset-0 h-full w-full" aria-hidden>
+            <rect x="18" y="14" width="264" height="116" rx="8" fill="#06120c" stroke="rgba(74,222,128,0.25)" />
+            {[[42,40],[66,88],[96,54],[120,104],[150,76],[180,46],[204,96],[232,62],[256,110],[82,120]].map(([x,y],i) => (
+              <circle key={i} cx={x} cy={y} r={i % 3 === 0 ? 3.2 : 2.4} fill="#4ade80" opacity="0.9" />
+            ))}
+            {[[110,40],[160,110],[220,34],[70,58],[246,86]].map(([x,y],i) => (
+              <circle key={`h${i}`} cx={x} cy={y} r="4" fill="#38bdf8" />
+            ))}
+            <circle cx="190" cy="76" r="5.5" fill="#f43f5e" />
+            <circle cx="76" cy="98" r="5.5" fill="#f43f5e" />
+            <path d="M190 76 L160 110 M76 98 L70 58" stroke="rgba(244,63,94,0.5)" strokeWidth="1.2" strokeDasharray="3 3" />
+            <ellipse cx="196" cy="78" rx="34" ry="26" fill="rgba(244,63,94,0.08)" />
+            <ellipse cx="84" cy="92" rx="30" ry="22" fill="rgba(56,189,248,0.10)" />
           </svg>
         )}
         <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-black tracking-wider text-white uppercase">

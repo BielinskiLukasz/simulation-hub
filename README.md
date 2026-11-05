@@ -1,9 +1,10 @@
 # Simulation Hub
 
-**Phase 5 — Physics & Circuits.** A deterministic simulation platform with **17 simulations across four execution paradigms** (real-time, batch, event, trace) under **Contract v5**:
+**Phase 5 — Physics & Circuits.** A deterministic simulation platform with **18 simulations across four execution paradigms** (real-time, batch, event, trace) under **Contract v5**:
 
 | Sim | Kind | Showcases |
 |---|---|---|
+| **Ecosystem & Spatial Agents** | realtime | Predator–prey energy web, non-wrapping spatial hash, territory overlay, lockstep compare |
 | **N-Body Gravity** | realtime | Integrators, Barnes–Hut, energy diagnostics, camera, realtime compare |
 | **Soft Body & Cloth** | realtime | Verlet constraints, grab/cut/tear, wind, iterations compare |
 | **Circuit / Logic Gates** | event | 3-valued event logic, editor, waveforms, verified 4-bit adder |
@@ -22,11 +23,11 @@
 | **Monte Carlo π** | batch | Deterministic chunked estimation, $1/\sqrt{N}$ confidence band tightening |
 | **Bouncing Balls** | realtime | Fixed-timestep accumulator loop, restitution, seeded Mulberry32 RNG, URL state |
 
-Press **P** in any real-time simulation for the performance HUD. Trace sims support playback, stepping and two-pane compare; the grid editor is shared by Pathfinding and Falling Sand.
+Press **P** in any real-time simulation for the performance HUD. **Compare Mode** is live: trace sims have an in-page compare tab, and N-Body/Cloth/Ecosystem have a lockstep two-pane Compare button (shared seed, mirrored input, linked cameras, `cmp=` links). Trace sims support playback, stepping and two-pane compare; the grid editor is shared by Pathfinding and Falling Sand.
 Press **Space** (play/pause), **.** (step forward), **,** (step back), **Home** / **End**, or scrub the timeline in any event simulation.
 Every simulation run is bit-identical and shareable via its URL hash (e.g. `#/sim/raft?scenario=isolate-leader`, `#/sim/cpu-scheduler?algorithm=sjf`).
 
-**Live demo:** `https://bielinskilukasz.github.io/simulation-hub/`
+**Live demo:**  [Simulation Hub](https://bielinskilukasz.github.io/simulation-hub/)
 
 ![CI](https://github.com/bielinskilukasz/simulation-hub/actions/workflows/deploy.yml/badge.svg)
 
@@ -35,7 +36,7 @@ Every simulation run is bit-identical and shareable via its URL hash (e.g. `#/si
 ```bash
 npm install
 npm run dev        # dev server
-npm test           # Vitest — 247 tests, node environment (core needs no DOM)
+npm test           # Vitest — 256 tests, node environment (core needs no DOM)
 npm run lint       # ESLint, incl. the architecture rules below
 npm run typecheck  # tsc --noEmit (strict + noUncheckedIndexedAccess)
 npm run build      # production build

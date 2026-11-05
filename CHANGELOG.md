@@ -1,5 +1,10 @@
 # Changelog
 
+## Phase 5 addendum — Compare Mode shipped & Ecosystem simulator
+
+- **Compare Mode promoted from roadmap:** trace sims (Pathfinding, Cache Hierarchy) already had in-page compare; Phase 5 added realtime lockstep compare (`RunnerGroup`, mirrored input, linked cameras, `cmp`/`b.*` URLs) to N-Body, Cloth and now Ecosystem. The stale hub teaser was removed.
+- **Ecosystem & Spatial Agents (new realtime sim):** seeded plant → herbivore → predator energy web; non-wrapping `SpatialHash` neighbour queries; decays-per-step territory claim overlay; reproduction, starvation and predation; camera, diagnostics, live params, click/shift/alt painting, and three lockstep compare modes (predators, perception, regrowth). 9 new tests cover determinism, bounds, starvation, meal energy, plant cap, predation pressure, territory, non-wrapping hash vs brute force, pointer and live params.
+
 ## Contract v5 — Phase 5 (Physics & Circuits)
 
 - **Platform:** pure camera math + gesture controls (pan/zoom/pinch, F fit, follow), selectable integrators (Euler, semi-implicit, Verlet, RK4) with a zero-allocation `Stepper`, conserved-quantity diagnostics with a decimating recorder and log-drift chart, flat-array Barnes–Hut quadtree, Tarjan SCC, shared varint/base64 codec helpers, non-wrapping spatial hash, and `RunnerGroup` lockstep realtime compare with mirrored input and linked cameras.

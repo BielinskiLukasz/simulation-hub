@@ -21,6 +21,7 @@ import { meta as cacheHierarchy } from './cache-hierarchy/meta';
 import { meta as nBody } from './n-body/meta';
 import { meta as cloth } from './cloth/meta';
 import { meta as circuit } from './circuit/meta';
+import { meta as ecosystem } from './ecosystem/meta';
 
 // Order is STABLE and append-only: Phase 1 → Phase 4, in the order each sim
 // was added. New simulations go at the END, so adding one never reshuffles
@@ -45,4 +46,5 @@ export const entries: SimEntry[] = [
   { meta: nBody, load: () => import('./n-body/index') },
   { meta: cloth, load: () => import('./cloth/index') },
   { meta: circuit, load: () => import('./circuit/index') },
+  { meta: ecosystem, load: () => import('./ecosystem/index') },
 ];
